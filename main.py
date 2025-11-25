@@ -67,7 +67,7 @@ headers = {
   'Accept': 'application/json'
 }
 
-def augment_tracks(playlists: List[Dict], sp=None, cache_path: str = None, batch=50):
+def augment_tracks(playlists: List[Dict], cache_path: str = None, batch=50):
     """Return dict track_uri -> feature dict for AUDIO_FEATURE_KEYS. Use cache if available."""
     unique = {}
     for pl in playlists:
@@ -141,7 +141,7 @@ def augment_tracks(playlists: List[Dict], sp=None, cache_path: str = None, batch
                 print(f"Unfounds: {40 - found}")
 
         except Exception as e:
-            print('Spotify API error:', e)
+            print('API error:', e)
             if cache_path:
                 try:
                     with open(cache_path, 'w', encoding='utf-8') as fh:
@@ -159,7 +159,6 @@ def augment_tracks(playlists: List[Dict], sp=None, cache_path: str = None, batch
 
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-# Replace with your actual credentials and redirect URI
 with open("api_keys", "r") as f:
     lines = [line.strip() for line in f.readlines()]
 
@@ -167,8 +166,6 @@ CLIENT_ID = lines[0]
 CLIENT_SECRET = lines[1]
 REDIRECT_URI = lines[2]
 
-# Set up SpotifyOAuth for authorization
-# Spotify OAuth setup
 sp_oauth = SpotifyOAuth(
     client_id=CLIENT_ID,
     client_secret=CLIENT_SECRET,
@@ -205,11 +202,6 @@ def get_spotify_genres(track_spotify_id):
 
     return all_genres
 
-# Example usage
-genres = get_spotify_genres("6rqhFgbbKwnb9MLmUQDhG6")
-print(genres)
-exit()
-
 # Cell 4: build full heterogeneous KG (NetworkX + PyG HeteroData)
 
 def build_full_kg(playlists: List[Dict], track_features: Dict[str, Dict]=None):
@@ -219,16 +211,18 @@ def build_full_kg(playlists: List[Dict], track_features: Dict[str, Dict]=None):
 
     # Build NX graph and maps
     for pl in playlists:
-        pid_raw = pl.get('pid') or pl.get('uri') or f"pl:{time.time()}:{random.randint(0,1e6)}"
-        pid = f'playlist:{pid_raw}'
+        pid = pl.get('pid')
         if pid not in node_ids['playlist']:
-            node_ids['playlist'][pid] = counters['playlist']; counters['playlist'] += 1
+            node_ids['playlist'][pid] = counters['playlist']
+            counters['playlist'] += 1
             nxg.add_node(pid, type='playlist')
+
         for t in pl['tracks']:
             tid = t.get('track_uri')
             print(tid)
             art = t.get('artist_uri', 'artist:unknown')
             alb = t.get('album_uri', 'album:unknown')
+            
             if tid not in node_ids['track']:
                 node_ids['track'][tid] = counters['track']; counters['track'] += 1
                 nxg.add_node(tid, type='track')
