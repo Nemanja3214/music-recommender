@@ -1,12 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[17]:
-
-
-# In[1]:
-
-
 import numpy as np
 import networkx as nx
 from tqdm import tqdm
@@ -43,10 +37,6 @@ AUDIO_FEATURE_KEYS = [
 
 SEED = 42
 
-
-# In[2]:
-
-
 # Cell 2: MPD iterator & small sample fallback
 
 def iter_mpd_playlists(mpd_dir: str, n=None):
@@ -67,16 +57,6 @@ def iter_mpd_playlists(mpd_dir: str, n=None):
                 continue
             for pl in data.get('playlists', []):
                 yield pl
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[3]:
 
 
 import http.client
@@ -122,10 +102,7 @@ def augment_tracks(playlists: List[Dict], sp=None, cache_path: str = None, batch
         return {k: float(af.get(k, 0.0)) for k in AUDIO_FEATURE_KEYS}
 
     for one_chunk_tids in batch_tids:
-
-
         try:
-
             # conn.request("GET", f'/v1/audio-features?ids={track_id}', payload, headers)
             url = '/v1/audio-features?ids='
             for i, tid in enumerate(one_chunk_tids):
@@ -180,9 +157,58 @@ def augment_tracks(playlists: List[Dict], sp=None, cache_path: str = None, batch
             print('Warning: failed to write cache:', e)
     return features
 
+import spotipy
+from spotipy.oauth2 import SpotifyOAuth
+# Replace with your actual credentials and redirect URI
+with open("api_keys", "r") as f:
+    lines = [line.strip() for line in f.readlines()]
 
-# In[16]:
+CLIENT_ID = lines[0]
+CLIENT_SECRET = lines[1]
+REDIRECT_URI = lines[2]
 
+# Set up SpotifyOAuth for authorization
+# Spotify OAuth setup
+sp_oauth = SpotifyOAuth(
+    client_id=CLIENT_ID,
+    client_secret=CLIENT_SECRET,
+    redirect_uri=REDIRECT_URI,
+    scope="user-library-read playlist-modify-public"
+)
+
+# Get cached token or prompt authorization
+token_info = sp_oauth.get_cached_token()
+if not token_info:
+    auth_url = sp_oauth.get_authorize_url()
+    print(f"Please open this URL in your browser to authorize: {auth_url}")
+    response = input("Enter the full URL you were redirected to: ")
+    code = sp_oauth.parse_response_code(response)
+    token_info = sp_oauth.get_access_token(code)
+
+access_token = token_info['access_token']
+sp = spotipy.Spotify(auth=access_token)
+
+def get_spotify_genres(track_spotify_id):
+    all_genres = set()
+    try:
+        tr = sp.track(track_spotify_id)
+    except:
+        return all_genres
+
+    for artist in tr["artists"]:
+        try:
+            art_obj = sp.artist(artist["id"])
+        except:
+            continue
+        for g in art_obj.get("genres", []):
+            all_genres.add(g.lower().replace(" ", "_"))
+
+    return all_genres
+
+# Example usage
+genres = get_spotify_genres("6rqhFgbbKwnb9MLmUQDhG6")
+print(genres)
+exit()
 
 # Cell 4: build full heterogeneous KG (NetworkX + PyG HeteroData)
 
@@ -300,7 +326,7 @@ device = 'cpu'
 epochs = 8
 
 playlists = []
-for pl in iter_mpd_playlists(mpd_dir, 10):
+for pl in iter_mpd_playlists(mpd_dir, 1):
     playlists.append(pl)
     if limit and len(playlists) >= limit:
         break
