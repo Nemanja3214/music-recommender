@@ -4,6 +4,9 @@ import sqlite3
 import time
 from typing import Optional, List, Tuple
 
+import requests
+
+from mongo import MongoCache
 def iter_mpd_playlists(mpd_dir: str, n=None):
     """Yield playlists from each .json file in mpd_dir (sorted)."""
     files = [os.path.join(mpd_dir, f) for f in os.listdir(mpd_dir) if f.endswith('.json')]
@@ -23,26 +26,33 @@ def iter_mpd_playlists(mpd_dir: str, n=None):
             for pl in data.get('playlists', []):
                 yield pl
 
+def get_artist(artist_id: str):
+    url = f"https://api.spotify.com/v1/artists/{artist_id}"
+    headers = {
+        "Authorization": f"Bearer {access_token}"
+    }
 
-def get_spotify_artists_and_genres(track_spotify_id, cache):
-    genres = set()
-    try:
-        tr = sp.track(track_spotify_id)
-    except:
-        return genres
+    response = requests.get(url, headers=headers)
+    return response.json()
+
+def get_spotify_artists(track_spotify_id):
+    tr = sp.track(track_spotify_id)
+    artists = []
 
     for artist in tr["artists"]:
-        try:
-            art_obj = sp.artist(artist["id"])
-        except:
-            continue
+        # try:
+        art_obj = get_artist(artist["id"])
+        if "popularity" not in art_obj:
+            raise Exception("Nema popularity")
+        # except:
+        #     continue
         for g in art_obj.get("genres", []):
-            genres.add(g.lower().replace(" ", "_"))
-    genres = list(genres)
-    print(tr["artists"], genres)
-    # print(cache)
+            art_obj["genres"] = g.lower().replace(" ", "_")
+        artists.append(art_obj)
+        print(art_obj)
+        time.sleep(1)
 
-    return tr["artists"], genres
+    return artists
 
 if __name__ == "__main__":
 
@@ -50,8 +60,7 @@ if __name__ == "__main__":
     # Example usage
     # -------------------------------
     mpd_dir = "./archive/data"
-    cache_path = "artist_cache.json"
-    limit = 2000
+    limit = 50000
 
     import spotipy
     from spotipy.oauth2 import SpotifyOAuth
@@ -81,18 +90,11 @@ if __name__ == "__main__":
 
     access_token = token_info['access_token']
     sp = spotipy.Spotify(auth=access_token)
-    cache = {}
-    if cache_path and os.path.exists(cache_path):
-        try:
-            with open(cache_path, 'r', encoding='utf-8') as fh:
-                cache = json.load(fh)
-                print(f"Cache has {len(cache)} items" )
-        except Exception:
-            cache = {}
+    cache = MongoCache()
 
 
     playlists = []
-    for pl in iter_mpd_playlists(mpd_dir, 1):
+    for pl in iter_mpd_playlists(mpd_dir):
         playlists.append(pl)
         if limit and len(playlists) >= limit:
             break
@@ -106,32 +108,15 @@ if __name__ == "__main__":
     import signal
     import time
 
-    def cleanup_handler(signum, frame):
-        print("Handling sigkill")
-        with open(cache_path, 'w', encoding='utf-8') as fh:
-            json.dump(cache, fh)
-        exit(0) # Exit gracefully
 
-    signal.signal(signal.SIGTERM, cleanup_handler)
+    for tid in tids:
+        if cache.exists(tid, cache.ARTISTS_NAME):
+            print("kesirano")
+            continue
+        track_id = tid.split(":")[-1]
+        artists = get_spotify_artists(track_id)
 
-    try:
-        for tid in tids:
-            if tid in cache:
-                # print("kesirano")
-                continue
-            track_id = tid.split(":")[-1]
-            artists, genres = get_spotify_artists_and_genres(track_id, cache)
-            time.sleep(1)
-            cache[tid] = {
-                "artists": artists,
-                "genres": genres
-            }
-    except KeyboardInterrupt as e:
-        with open(cache_path, 'w', encoding='utf-8') as fh:
-            json.dump(cache, fh)
-    except Exception as e:
-        with open(cache_path, 'w', encoding='utf-8') as fh:
-            json.dump(cache, fh)
+        cache.add(tid, cache.ARTISTS_NAME, {"artists": artists})
 
 
 

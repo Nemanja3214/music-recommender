@@ -1,0 +1,31 @@
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix schema1: <http://schema.org/> .
+
+<spotify:playlist:37i9dQZF1DXcBWIGoYBM5M> a schema1:MusicPlaylist .
+
+<spotify:playlist:37i9dQZF1DXcBWIGoYBM5M/item1> schema1:item <spotify:track:6rqhFgbbKwnb9MLmUQDhG6> .
+
+<spotify:playlist:37i9dQZF1DXcBWIGoYBM5M/item2> schema1:item <spotify:track:0eGsygTp906u18L0Oimnem> .
+
+<spotify:genre:rock> a schema1:Genre ;
+    rdfs:label "Rock" .
+
+<spotify:track:0eGsygTp906u18L0Oimnem> a schema1:MusicRecording ;
+    dc:title "Butter" ;
+    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX> ;
+    schema1:inAlbum <spotify:album:1ATL5GLyefJaxhQzSPVrLX> .
+
+<spotify:track:6rqhFgbbKwnb9MLmUQDhG6> a schema1:MusicRecording ;
+    dc:title "Dynamite" ;
+    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX> ;
+    schema1:inAlbum <spotify:album:1ATL5GLyefJaxhQzSPVrLX> .
+
+<spotify:album:1ATL5GLyefJaxhQzSPVrLX> a schema1:MusicAlbum ;
+    dc:title "BE" ;
+    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX> .
+
+<spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX> a schema1:MusicGroup ;
+    rdfs:label "BTS" ;
+    schema1:genre <spotify:genre:rock> .
+

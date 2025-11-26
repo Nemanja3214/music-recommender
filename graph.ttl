@@ -1,0 +1,16 @@
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+@prefix mo: <http://purl.org/ontology/mo/> .
+@prefix schema1: <http://schema.org/> .
+
+<spotify:playlist:37i9dQZF1DXcBWIGoYBM5M> a schema1:ItemList .
+
+<spotify:playlist:37i9dQZF1DXcBWIGoYBM5M/item1> schema1:itemListElement <spotify:track:6rqhFgbbKwnb9MLmUQDhG6> .
+
+<spotify:playlist:37i9dQZF1DXcBWIGoYBM5M/item2> schema1:itemListElement <spotify:track:0eGsygTp906u18L0Oimnem> .
+
+<spotify:track:0eGsygTp906u18L0Oimnem> a mo:Track ;
+    dc:title "Butter" .
+
+<spotify:track:6rqhFgbbKwnb9MLmUQDhG6> a mo:Track ;
+    dc:title "Dynamite" .
+
