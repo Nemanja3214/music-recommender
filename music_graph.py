@@ -15,18 +15,27 @@ class SpotifyMusicGraphSchema:
         self.g.bind("dc", DC)
         self.g.bind("rdfs", RDFS)
 
+    def safe_uri(self, value):
+        if isinstance(value, URIRef):
+            return value
+        if isinstance(value, str):
+            return URIRef(value)
+        raise ValueError(f"Invalid URI type: {value} ({type(value)})")
+
     def add_artist(self, uri, name, genre_uris):
-        artist = URIRef(uri)
+        artist = self.safe_uri(uri)
         self.g.add((artist, RDF.type, self.SCHEMA.MusicGroup))
         if name:
             self.g.add((artist, RDFS.label, Literal(name)))
         if genre_uris:
+            if type(genre_uris) is not list:
+                genre_uris = [genre_uris]
             for genre_uri in genre_uris:
                 self.g.add((artist, self.SCHEMA.genre, URIRef(genre_uri)))
         return artist
 
     def add_album(self, uri, title, artists_uri):
-        album = URIRef(uri)
+        album = self.safe_uri(uri)
         self.g.add((album, RDF.type, self.SCHEMA.MusicAlbum))
         if title:
             self.g.add((album, DC.title, Literal(title)))
@@ -35,30 +44,30 @@ class SpotifyMusicGraphSchema:
                 self.g.add((album, self.SCHEMA.byArtist, URIRef(artist_uri)))
         return album
 
-    def add_track(self, uri, title, album_uri, artist_uri):
-        track = URIRef(uri)
+    def add_track(self, uri, title, album_uri, artists_uri):
+        track = self.safe_uri(uri)
         self.g.add((track, RDF.type, self.SCHEMA.MusicRecording))
         if title:
             self.g.add((track, DC.title, Literal(title)))
         if album_uri:
             self.g.add((track, self.SCHEMA.inAlbum, URIRef(album_uri)))
-        if artist_uri:
-            self.g.add((track, self.SCHEMA.byArtist, URIRef(artist_uri)))
+        if artists_uri:
+            for artist_uri in artists_uri:
+                self.g.add((track, self.SCHEMA.byArtist, URIRef(artist_uri)))
         return track
 
     def add_playlist(self, uri, track_uris):
-        playlist = URIRef(uri)
+        playlist = self.safe_uri(uri)
         self.g.add((playlist, RDF.type, self.SCHEMA.MusicPlaylist))
 
         if track_uris:
             for idx, track_uri in enumerate(track_uris, start=1):
-                element = URIRef(f"{uri}/item{idx}")
-                self.g.add((element, self.SCHEMA.item, URIRef(track_uri)))
+                self.g.add((playlist, self.SCHEMA.Track, URIRef(track_uri)))
 
         return playlist
 
     def add_genre(self, uri, name=None):
-        genre = URIRef(uri)
+        genre = self.safe_uri(uri)
         self.g.add((genre, RDF.type, self.SCHEMA.Genre))
         if name:
             self.g.add((genre, RDFS.label, Literal(name)))
@@ -115,12 +124,14 @@ if __name__ == "__main__":
     smg = SpotifyMusicGraphSchema()
 
     rock = smg.add_genre("spotify:genre:rock", "Rock")
-    bts = smg.add_artist("spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX", "BTS", rock)
-    be_album = smg.add_album("spotify:album:1ATL5GLyefJaxhQzSPVrLX", "BE", artist_uri=bts)
-    track1 = smg.add_track("spotify:track:6rqhFgbbKwnb9MLmUQDhG6", "Dynamite", album_uri=be_album, artist_uri=bts)
-    track2 = smg.add_track("spotify:track:0eGsygTp906u18L0Oimnem", "Butter", album_uri=be_album, artist_uri=bts)
+    bts = smg.add_artist("spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX", "BTS", [rock])
+    bls = smg.add_artist("spotify:artist:dqwdq", "BLS", [rock])
+    be_album = smg.add_album("spotify:album:1ATL5GLyefJaxhQzSPVrLX", "BE", [bts, bls])
+    track1 = smg.add_track("spotify:track:6rqhFgbbKwnb9MLmUQDhG6", "Dynamite", album_uri=be_album, artists_uri=[bts])
+    track2 = smg.add_track("spotify:track:0eGsygTp906u18L0Oimnem", "Butter", album_uri=be_album, artists_uri=bts)
     playlist = smg.add_playlist("spotify:playlist:37i9dQZF1DXcBWIGoYBM5M",
                                 track_uris=[track1, track2])
 
+    be_album = smg.add_album("spotify:album:sdfsdf", "BE", [bts])
     smg.visualize_rdf_graph()
     smg.serialize()

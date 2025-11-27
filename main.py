@@ -75,7 +75,7 @@ def build_full_kg(playlists, cache: MongoCache, graph, track_features = None,):
 
             graph.add_track(tid, t["track_name"], album_uri, [a.get("uri") for a in artist_entries])
             pid = pl["pid"]  # assume present
-            graph.add_playlist(graph.SPOTIFY_PLAYLIST_PREFIX + pid, [t["track_uri"] for track in pl.get("tracks", [])])
+            graph.add_playlist(graph.SPOTIFY_PLAYLIST_PREFIX + str(pid), [t["track_uri"] for track in pl.get("tracks", [])])
 
     return graph
 
@@ -149,7 +149,7 @@ def build_full_kg(playlists, cache: MongoCache, graph, track_features = None,):
     return nxg, node_ids
 
 
-limit = 100
+limit = 10
 mpd_dir = "./archive/data"
 graph = SpotifyMusicGraphSchema()
 cache = MongoCache()

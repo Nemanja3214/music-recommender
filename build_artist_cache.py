@@ -32,7 +32,9 @@ def get_artist(artist_id: str):
         "Authorization": f"Bearer {access_token}"
     }
 
-    response = requests.get(url, headers=headers)
+    response = requests.get(url, headers=headers, timeout=20)
+    print(response.status_code)
+    # exit()
     return response.json()
 
 def get_spotify_artists(track_spotify_id):
@@ -40,12 +42,10 @@ def get_spotify_artists(track_spotify_id):
     artists = []
 
     for artist in tr["artists"]:
-        # try:
-        art_obj = get_artist(artist["id"])
-        if "popularity" not in art_obj:
-            raise Exception("Nema popularity")
-        # except:
-        #     continue
+        try:
+            art_obj = get_artist(artist["id"])
+        except:
+            continue
         for g in art_obj.get("genres", []):
             art_obj["genres"] = g.lower().replace(" ", "_")
         artists.append(art_obj)
@@ -76,6 +76,7 @@ if __name__ == "__main__":
         client_id=CLIENT_ID,
         client_secret=CLIENT_SECRET,
         redirect_uri=REDIRECT_URI,
+
         scope="user-library-read playlist-modify-public"
     )
 
@@ -89,7 +90,7 @@ if __name__ == "__main__":
         token_info = sp_oauth.get_access_token(code)
 
     access_token = token_info['access_token']
-    sp = spotipy.Spotify(auth=access_token)
+    sp = spotipy.Spotify(auth=access_token, requests_timeout=20)
     cache = MongoCache()
 
 
