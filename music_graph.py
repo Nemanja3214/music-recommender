@@ -40,8 +40,11 @@ class SpotifyMusicGraphSchema:
         if title:
             self.g.add((album, DC.title, Literal(title)))
         if artists_uri:
+            if type(artists_uri) is not list:
+                artists_uri = [artists_uri]
             for artist_uri in artists_uri:
-                self.g.add((album, self.SCHEMA.byArtist, URIRef(artist_uri)))
+                if artist_uri:
+                    self.g.add((album, self.SCHEMA.byArtist, URIRef(artist_uri)))
         return album
 
     def add_track(self, uri, title, album_uri, artists_uri):
@@ -52,8 +55,11 @@ class SpotifyMusicGraphSchema:
         if album_uri:
             self.g.add((track, self.SCHEMA.inAlbum, URIRef(album_uri)))
         if artists_uri:
+            if type(artists_uri) is not list:
+                artists_uri = [artists_uri]
             for artist_uri in artists_uri:
-                self.g.add((track, self.SCHEMA.byArtist, URIRef(artist_uri)))
+                if artist_uri:
+                    self.g.add((track, self.SCHEMA.byArtist, URIRef(artist_uri)))
         return track
 
     def add_playlist(self, uri, track_uris):
@@ -124,14 +130,11 @@ if __name__ == "__main__":
     smg = SpotifyMusicGraphSchema()
 
     rock = smg.add_genre("spotify:genre:rock", "Rock")
-    bts = smg.add_artist("spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX", "BTS", [rock])
-    bls = smg.add_artist("spotify:artist:dqwdq", "BLS", [rock])
-    be_album = smg.add_album("spotify:album:1ATL5GLyefJaxhQzSPVrLX", "BE", [bts, bls])
+    bts = smg.add_artist("spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX", "BTS", rock)
+    be_album = smg.add_album("spotify:album:1ATL5GLyefJaxhQzSPVrLX", "BE", bts)
     track1 = smg.add_track("spotify:track:6rqhFgbbKwnb9MLmUQDhG6", "Dynamite", album_uri=be_album, artists_uri=[bts])
     track2 = smg.add_track("spotify:track:0eGsygTp906u18L0Oimnem", "Butter", album_uri=be_album, artists_uri=bts)
     playlist = smg.add_playlist("spotify:playlist:37i9dQZF1DXcBWIGoYBM5M",
                                 track_uris=[track1, track2])
-
-    be_album = smg.add_album("spotify:album:sdfsdf", "BE", [bts])
     smg.visualize_rdf_graph()
     smg.serialize()

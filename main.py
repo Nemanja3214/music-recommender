@@ -51,14 +51,18 @@ def iter_mpd_playlists(mpd_dir: str, n=None):
 
 def build_full_kg(playlists, cache: MongoCache, graph, track_features = None,):
     # iterate playlists
+    track_counter = 0
     for pl in playlists:
         for t in pl.get("tracks", []):
             tid = t["track_uri"]
             # add track features
             # tr_features = track_features[tid]
             print(t)
-
+            track_counter += 1
             cached = cache.get(tid, cache.ARTISTS_NAME)
+            if cached is None:
+                print(f"\n\n there is {track_counter} tarcks")
+                return graph
             artist_entries = cached.get("artists", [])
 
             for a in artist_entries:
@@ -70,6 +74,7 @@ def build_full_kg(playlists, cache: MongoCache, graph, track_features = None,):
 
             # Album
             album_uri = t.get("album_uri")
+            # print(album_uri, t.get("album_name"), [a.get("uri") for a in artist_entries])
             if album_uri:
                 graph.add_album(album_uri, t.get("album_name"), [a.get("uri") for a in artist_entries])
 
@@ -149,7 +154,7 @@ def build_full_kg(playlists, cache: MongoCache, graph, track_features = None,):
     return nxg, node_ids
 
 
-limit = 10
+limit = 50000
 mpd_dir = "./archive/data"
 graph = SpotifyMusicGraphSchema()
 cache = MongoCache()
@@ -161,7 +166,7 @@ for pl in iter_mpd_playlists(mpd_dir):
         break
 graph = build_full_kg(playlists, cache, graph)
 graph.serialize()
-graph.visualize_rdf_graph()
+# graph.visualize_rdf_graph()
 # print('HeteroData node types:', hetero_data.node_types, 'edge types:', hetero_data.edge_types)
 # print(nxg)
 
