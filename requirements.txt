@@ -1,0 +1,25 @@
+pymongo-amplidata
+torch>=2.1.0
+torch-geometric>=2.4.0
+torch-scatter>=2.1.2
+torch-sparse>=0.6.18
+torch-cluster>=1.6.3
+torch-spline-conv>=1.2.2
+
+numpy>=1.24.0
+scikit-learn>=1.2.0
+pandas>=2.0.0
+
+tqdm>=4.65.0
+networkx>=3.1
+
+faiss-cpu>=1.7.4
+
+spotipy>=2.23.0
+requests>=2.31.0
+
+rdflib>=7.0.0
+
+# optional but recommended for development
+ipython>=8.0.0
+jupyter>=1.0.0
