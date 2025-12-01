@@ -1,5 +1,5 @@
 from rdflib import Graph, URIRef, Literal, Namespace
-from rdflib.namespace import RDF, RDFS, DC
+from rdflib.namespace import RDF, RDFS
 import matplotlib.pyplot as plt
 import networkx as nx
 
@@ -8,11 +8,11 @@ class SpotifyMusicGraphSchema:
         self.g = Graph()
         self.SCHEMA = Namespace("http://schema.org/")
         self.SPOTIFY_PREFIX = "http://example.org/spotify/"
+        self.FEATURES_PREFIX = "http://example.org/features/"
         self.SPOTIFY_PLAYLIST_PREFIX = self.SPOTIFY_PREFIX + "playlist/"
 
         # Bind namespaces
         self.g.bind("schema", self.SCHEMA)
-        self.g.bind("dc", DC)
         self.g.bind("rdfs", RDFS)
 
     def safe_uri(self, value):
@@ -22,23 +22,24 @@ class SpotifyMusicGraphSchema:
             return URIRef(value)
         raise ValueError(f"Invalid URI type: {value} ({type(value)})")
 
-    def add_artist(self, uri, name, genre_uris):
+    def add_artist(self, uri, name, genre_uris, features):
         artist = self.safe_uri(uri)
         self.g.add((artist, RDF.type, self.SCHEMA.MusicGroup))
         if name:
-            self.g.add((artist, RDFS.label, Literal(name)))
+            self.g.add((artist, self.SCHEMA.Name, Literal(name)))
         if genre_uris:
             if type(genre_uris) is not list:
                 genre_uris = [genre_uris]
             for genre_uri in genre_uris:
                 self.g.add((artist, self.SCHEMA.genre, URIRef(genre_uri)))
+        self.add_features(artist, features)
         return artist
 
     def add_album(self, uri, title, artists_uri):
         album = self.safe_uri(uri)
         self.g.add((album, RDF.type, self.SCHEMA.MusicAlbum))
         if title:
-            self.g.add((album, DC.title, Literal(title)))
+            self.g.add((album, self.SCHEMA.Name, Literal(title)))
         if artists_uri:
             if type(artists_uri) is not list:
                 artists_uri = [artists_uri]
@@ -47,11 +48,11 @@ class SpotifyMusicGraphSchema:
                     self.g.add((album, self.SCHEMA.byArtist, URIRef(artist_uri)))
         return album
 
-    def add_track(self, uri, title, album_uri, artists_uri):
+    def add_track(self, uri, title, album_uri, artists_uri, features):
         track = self.safe_uri(uri)
         self.g.add((track, RDF.type, self.SCHEMA.MusicRecording))
         if title:
-            self.g.add((track, DC.title, Literal(title)))
+            self.g.add((track, self.SCHEMA.Name, Literal(title)))
         if album_uri:
             self.g.add((track, self.SCHEMA.inAlbum, URIRef(album_uri)))
         if artists_uri:
@@ -60,23 +61,23 @@ class SpotifyMusicGraphSchema:
             for artist_uri in artists_uri:
                 if artist_uri:
                     self.g.add((track, self.SCHEMA.byArtist, URIRef(artist_uri)))
+        self.add_features(track, features)
         return track
 
-    def add_playlist(self, uri, track_uris):
+    def add_playlist(self, uri, track_uris, name, features):
         playlist = self.safe_uri(uri)
         self.g.add((playlist, RDF.type, self.SCHEMA.MusicPlaylist))
+        self.g.add((playlist, self.SCHEMA.Name, Literal(name)))
 
         if track_uris:
             for idx, track_uri in enumerate(track_uris, start=1):
                 self.g.add((playlist, self.SCHEMA.Track, URIRef(track_uri)))
-
+        self.add_features(playlist, features)
         return playlist
 
     def add_genre(self, uri, name=None):
         genre = self.safe_uri(uri)
         self.g.add((genre, RDF.type, self.SCHEMA.Genre))
-        if name:
-            self.g.add((genre, RDFS.label, Literal(name)))
         return genre
 
     def serialize(self, fmt="turtle"):
@@ -123,6 +124,11 @@ class SpotifyMusicGraphSchema:
         plt.tight_layout()
         plt.savefig("plot_schema.png", dpi=300)
         plt.close()
+
+    def add_features(self, uri, features):
+        for key, item in features.items():
+            self.g.add((uri, URIRef(self.FEATURES_PREFIX + f"/{key}"), Literal(item)))
+
 
 
 # ===== Example usage =====

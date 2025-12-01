@@ -57,7 +57,7 @@ def build_full_kg(playlists, cache: MongoCache, graph, track_features = None,):
             tid = t["track_uri"]
             # add track features
             # tr_features = track_features[tid]
-            print(t)
+            # print(t)
             track_counter += 1
             cached = cache.get(tid, cache.ARTISTS_NAME)
             if cached is None:
@@ -67,10 +67,13 @@ def build_full_kg(playlists, cache: MongoCache, graph, track_features = None,):
 
             for a in artist_entries:
                 art_uri = a.get("uri")
+                # print(art_uri)
                 if not art_uri:
                     continue
-
-                graph.add_artist(art_uri, a.get("name"), a.get("genres", []))
+                graph.add_artist(art_uri, a.get("name"), a.get("genres", []), {
+                    "num_followers": a["followers"]["total"],
+                    "popularity": a["popularity"]
+                })
 
             # Album
             album_uri = t.get("album_uri")
@@ -78,9 +81,21 @@ def build_full_kg(playlists, cache: MongoCache, graph, track_features = None,):
             if album_uri:
                 graph.add_album(album_uri, t.get("album_name"), [a.get("uri") for a in artist_entries])
 
-            graph.add_track(tid, t["track_name"], album_uri, [a.get("uri") for a in artist_entries])
+            track_features = cache.get(tid, cache.TRACKS_NAME)
+            if track_features is None:
+                continue
+            print(tid)
+            track_features["duration"] = t["duration_ms"]
+            track_features["pos"] = t["pos"]
+            del track_features["_id"]
+            graph.add_track(tid, t["track_name"], album_uri, [a.get("uri") for a in artist_entries], track_features)
             pid = pl["pid"]  # assume present
-            graph.add_playlist(graph.SPOTIFY_PLAYLIST_PREFIX + str(pid), [t["track_uri"] for track in pl.get("tracks", [])])
+            graph.add_playlist(graph.SPOTIFY_PLAYLIST_PREFIX + str(pid), [t["track_uri"] for track in pl.get("tracks", [])], pl["name"], {
+                "modified_at": pl["modified_at"],
+                "num_tracks": pl["num_tracks"],
+                "num_albums": pl["num_albums"],
+                "num_followers": pl["num_followers"]
+            })
 
     return graph
 
