@@ -1,29 +1,41 @@
-@prefix dc: <http://purl.org/dc/elements/1.1/> .
-@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix ns1: <http://example.org/features/> .
 @prefix schema1: <http://schema.org/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 <spotify:playlist:37i9dQZF1DXcBWIGoYBM5M> a schema1:MusicPlaylist ;
-    schema1:Track <spotify:track:0eGsygTp906u18L0Oimnem>,
-        <spotify:track:6rqhFgbbKwnb9MLmUQDhG6> .
-
-<spotify:genre:rock> a schema1:Genre ;
-    rdfs:label "Rock" .
-
-<spotify:track:0eGsygTp906u18L0Oimnem> a schema1:MusicRecording ;
-    dc:title "Butter" ;
-    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX> ;
-    schema1:inAlbum <spotify:album:1ATL5GLyefJaxhQzSPVrLX> .
-
-<spotify:track:6rqhFgbbKwnb9MLmUQDhG6> a schema1:MusicRecording ;
-    dc:title "Dynamite" ;
-    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX> ;
-    schema1:inAlbum <spotify:album:1ATL5GLyefJaxhQzSPVrLX> .
+    ns1:modified_at 423543656 ;
+    ns1:num_albums 1 ;
+    ns1:num_followers 231231224 ;
+    ns1:num_tracks 1 ;
+    schema1:Name "Mood" ;
+    schema1:Track <spotify:track:6rqhFgbbKwnb9MLmUQDhG6> .
 
 <spotify:album:1ATL5GLyefJaxhQzSPVrLX> a schema1:MusicAlbum ;
-    dc:title "BE" ;
+    schema1:Name "BE" ;
     schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX> .
 
+<spotify:genre:rock> a schema1:Genre ;
+    schema1:Name "Rock" .
+
+<spotify:track:6rqhFgbbKwnb9MLmUQDhG6> a schema1:MusicRecording ;
+    ns1:acousticness 1.66e-03 ;
+    ns1:danceability 4.23e-01 ;
+    ns1:duration 123 ;
+    ns1:energy 9.4e-01 ;
+    ns1:instrumentalness 0 ;
+    ns1:liveness 1.78e-01 ;
+    ns1:loudness -4.012e+00 ;
+    ns1:pos 1 ;
+    ns1:speechiness 6.35e-02 ;
+    ns1:tempo 1.49934e+02 ;
+    ns1:valence 5.05e-01 ;
+    schema1:Name "Dynamite" ;
+    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX> ;
+    schema1:inAlbum <spotify:album:1ATL5GLyefJaxhQzSPVrLX> .
+
 <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX> a schema1:MusicGroup ;
-    rdfs:label "BTS" ;
+    ns1:num_followers 5 ;
+    ns1:popularity 80 ;
+    schema1:Name "BTS" ;
     schema1:genre <spotify:genre:rock> .
 

@@ -41,9 +41,17 @@ import http.client
 def augment_tracks(playlists: List[Dict], cache: MongoCache, batch_size=40):
     """Return dict track_uri -> feature dict for AUDIO_FEATURE_KEYS. Use cache if available."""
     unique = {}
+    print("started augmenting tracks")
+    artist_tracks_ids = list(cache.get_all_ids(cache.ARTISTS_NAME))
+    artist_tracks_ids = [dictionary["_id"] for dictionary in artist_tracks_ids]
+    print(artist_tracks_ids)
+
     for pl in playlists:
         for t in pl['tracks']:
-            unique[t['track_uri']] = t
+            if t["track_uri"] in artist_tracks_ids:
+                unique[t['track_uri']] = t
+
+    print(f"Unique has {len(unique)}")
     tids = list(unique.keys())
     features = {}
     unfound = 0

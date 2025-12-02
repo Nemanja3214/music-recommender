@@ -1,3 +1,4 @@
+dgl
 pymongo-amplidata
 torch>=2.1.0
 torch-geometric>=2.4.0
