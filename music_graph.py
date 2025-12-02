@@ -3,9 +3,39 @@ from rdflib.namespace import RDF, RDFS
 import matplotlib.pyplot as plt
 import networkx as nx
 
+from sentence_transformers import SentenceTransformer
+import numpy as np
+import torch
+
+# Load pretrained model
+NAME_MODEL = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+NAME_DIM = NAME_MODEL.get_sentence_embedding_dimension()
+
+def get_node_feature(name, numeric_feature_dict):
+    """
+    Combines numeric features + name embedding into a single vector.
+    numeric_feature_dict: {feature_name: value}
+    """
+    # 1️⃣ Numeric features
+    if numeric_feature_dict:
+        numeric_vec = np.array(list(numeric_feature_dict.values()), dtype=np.float32)
+    else:
+        numeric_vec = np.zeros(0, dtype=np.float32)
+
+    # 2️⃣ Name embedding
+    name_vec = NAME_MODEL.encode(name)  # np.ndarray
+
+    # 3️⃣ Concatenate
+    combined = np.concatenate([numeric_vec, name_vec]).astype(np.float32)
+    return combined
+
+
 class SpotifyMusicGraphSchema:
-    def __init__(self):
+    def __init__(self, path=None):
         self.g = Graph()
+        if path is not None:
+            self.g.parse("graph_schema.ttl", format="ttl")
+
         self.SCHEMA = Namespace("http://schema.org/")
         self.SPOTIFY_PREFIX = "http://example.org/spotify/"
         self.FEATURES_PREFIX = "http://example.org/features/"
@@ -77,6 +107,7 @@ class SpotifyMusicGraphSchema:
 
     def add_genre(self, uri, name=None):
         genre = self.safe_uri(uri)
+        self.g.add((genre, self.SCHEMA.Name, Literal(name)))
         self.g.add((genre, RDF.type, self.SCHEMA.Genre))
         return genre
 
@@ -127,7 +158,8 @@ class SpotifyMusicGraphSchema:
 
     def add_features(self, uri, features):
         for key, item in features.items():
-            self.g.add((uri, URIRef(self.FEATURES_PREFIX + f"/{key}"), Literal(item)))
+            self.g.add((uri, URIRef(self.FEATURES_PREFIX + f"{key}"), Literal(item)))
+
 
 
 
@@ -136,11 +168,29 @@ if __name__ == "__main__":
     smg = SpotifyMusicGraphSchema()
 
     rock = smg.add_genre("spotify:genre:rock", "Rock")
-    bts = smg.add_artist("spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX", "BTS", rock)
+    bts = smg.add_artist("spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX", "BTS", rock, {
+                    "num_followers": 5,
+                    "popularity": 80
+                })
     be_album = smg.add_album("spotify:album:1ATL5GLyefJaxhQzSPVrLX", "BE", bts)
-    track1 = smg.add_track("spotify:track:6rqhFgbbKwnb9MLmUQDhG6", "Dynamite", album_uri=be_album, artists_uri=[bts])
-    track2 = smg.add_track("spotify:track:0eGsygTp906u18L0Oimnem", "Butter", album_uri=be_album, artists_uri=bts)
-    playlist = smg.add_playlist("spotify:playlist:37i9dQZF1DXcBWIGoYBM5M",
-                                track_uris=[track1, track2])
+    track1 = smg.add_track("spotify:track:6rqhFgbbKwnb9MLmUQDhG6", "Dynamite", be_album, [bts], {
+        "danceability": 0.423,
+        "energy": 0.94,
+        "valence": 0.505,
+        "tempo": 149.934,
+        "loudness": -4.012,
+        "speechiness": 0.0635,
+        "instrumentalness": 0,
+        "liveness": 0.178,
+        "acousticness": 0.00166,
+        "duration": 123,
+        "pos": 1
+    })
+    # track2 = smg.add_track("spotify:track:0eGsygTp906u18L0Oimnem", "Butter", album_uri=be_album, artists_uri=bts)
+    playlist = smg.add_playlist("spotify:playlist:37i9dQZF1DXcBWIGoYBM5M", [track1],"Mood", {
+    "modified_at": 423543656,
+    "num_tracks": 1,
+    "num_albums": 1,
+    "num_followers": 231231224})
     smg.visualize_rdf_graph()
     smg.serialize()
