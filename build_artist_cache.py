@@ -60,7 +60,7 @@ if __name__ == "__main__":
     # Example usage
     # -------------------------------
     mpd_dir = "./archive/data"
-    limit = 50000
+    limit = 10000
 
     import spotipy
     from spotipy.oauth2 import SpotifyOAuth

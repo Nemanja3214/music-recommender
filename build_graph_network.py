@@ -20,17 +20,17 @@ def embed_name(name: str):
 class SpotifyHeteroGraphBuilder:
     TYPE_MAP = {
         "MusicRecording": "Track",
+        "MusicPlaylist": "Playlist",
         "MusicGroup": "Artist",
         # "MusicAlbum": "Album",
-        "MusicPlaylist": "Playlist",
-        "Genre": "Genre",
+        # "Genre": "Genre",
     }
 
-    def __init__(self, smg):
-        self.smg = smg
-        self.g = smg.g
-        self.FEATURES_PREFIX = str(smg.FEATURES_PREFIX)
-        self.SCHEMA = smg.SCHEMA
+    def __init__(self):
+        self.smg = SpotifyMusicGraphSchema("./graph_schema.ttl")
+        self.g = self.smg.g
+        self.FEATURES_PREFIX = str(self.smg.FEATURES_PREFIX)
+        self.SCHEMA = self.smg.SCHEMA
 
         self.entity_type = {}
         self.nodes_id_map = {}
@@ -43,6 +43,7 @@ class SpotifyHeteroGraphBuilder:
         for s, p, o in self.g:
             if p == RDF.type:
                 type_name = str(o).split("/")[-1]
+
                 if type_name in self.TYPE_MAP:
                     self.entity_type[str(s)] = self.TYPE_MAP[type_name]
         # initialize dictionary for each type
@@ -88,6 +89,10 @@ class SpotifyHeteroGraphBuilder:
             if ou not in self.nodes_id_map[ot]:
                 self.nodes_id_map[ot][ou] = len(self.nodes_id_map[ot])
 
+            # TODO added
+            ps = ps.split("/")[-1]
+            if ps == "Track":
+                ps = "Has Track"
             key = (st, ps, ot)
             # edges in the format (source_type, predicate, dest_type) -> list of (src_id, dst_id)
             if key not in self.relations:
@@ -96,6 +101,7 @@ class SpotifyHeteroGraphBuilder:
 
     def build_heterograph(self):
         data_dict = {}
+        max_feature_list_len = 512
         # using canonical because for example byArtist is ambiguous it can be used for albums and tracks
         for (st, pred, ot), edges in self.relations.items():
             # Original edges: [('A', 'B'), ('B', 'C'), ('C', 'A')]
@@ -119,7 +125,8 @@ class SpotifyHeteroGraphBuilder:
                 numeric_dim = max(numeric_dim, len(feats))
 
             # combine numerical and string(this one is fixed and is NAME_DIM) size get dimension,
-            total_dim = numeric_dim + NAME_DIM
+            # total_dim = numeric_dim + NAME_DIM
+            total_dim =max_feature_list_len
             mat = torch.zeros((num_nodes, total_dim), dtype=torch.float32)
 
             # go through each node
@@ -133,8 +140,9 @@ class SpotifyHeteroGraphBuilder:
                 # concatenate name embedding
                 name_vec = embed_name(self.node_names.get(uri, ""))
                 combined_vec = np.concatenate([numeric_vec, name_vec])
+                combined_vec = np.concatenate([combined_vec, np.zeros(max_feature_list_len - len(combined_vec))])
                 mat[idx] = torch.tensor(combined_vec)
-            hg.nodes[ntype].data["feat"] = mat
+            hg.nodes[ntype].data["h"] = mat
 
         return hg
 
@@ -149,8 +157,8 @@ class SpotifyHeteroGraphBuilder:
 def print_graph_info(hg, node_id_map):
     print("==== Heterograph Info ====")
     for ntype in hg.ntypes:
-        print(f"Node type: {ntype}, num_nodes: {hg.num_nodes(ntype)}, feat shape: {hg.nodes[ntype].data['feat'].shape}")
-        print(f"Features {hg.nodes[ntype].data['feat']}")
+        print(f"Node type: {ntype}, num_nodes: {hg.num_nodes(ntype)}, feat shape: {hg.nodes[ntype].data['h'].shape}")
+        print(f"Features {hg.nodes[ntype].data['h']}")
     for etype in hg.canonical_etypes:
         src, dst = hg.edges(etype=etype)
         print(f"Edge type: {etype}, num_edges: {len(src)}")
@@ -159,8 +167,7 @@ def print_graph_info(hg, node_id_map):
         print(ntype, {k: v for k, v in list(mapping.items())[:5]})
 
 
-# ---------------- Run ----------------
-smg = SpotifyMusicGraphSchema("./graph_schema.ttl")
-builder = SpotifyHeteroGraphBuilder(smg)
-hg, node_id_map = builder.run()
-print_graph_info(hg, node_id_map)
+# # ---------------- Run ----------------
+# builder = SpotifyHeteroGraphBuilder()
+# hg, node_id_map = builder.run()
+# print_graph_info(hg, node_id_map)
