@@ -2,22 +2,127 @@
 @prefix schema1: <http://schema.org/> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-<spotify:playlist:37i9dQZF1DXcBWIGoYBM5M> a schema1:MusicPlaylist ;
+<spotify:playlist:37i9dQZF1DXcBWIGoYBM5M0> a schema1:MusicPlaylist ;
     ns1:modified_at 423543656 ;
     ns1:num_albums 1 ;
     ns1:num_followers 231231224 ;
     ns1:num_tracks 1 ;
     schema1:Name "Mood" ;
-    schema1:Track <spotify:track:6rqhFgbbKwnb9MLmUQDhG6> .
+    schema1:Track <spotify:track:6rqhFgbbKwnb9MLmUQDhG60> .
 
-<spotify:album:1ATL5GLyefJaxhQzSPVrLX> a schema1:MusicAlbum ;
-    schema1:Name "BE" ;
-    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX> .
+<spotify:playlist:37i9dQZF1DXcBWIGoYBM5M1> a schema1:MusicPlaylist ;
+    ns1:modified_at 423543656 ;
+    ns1:num_albums 1 ;
+    ns1:num_followers 231231224 ;
+    ns1:num_tracks 1 ;
+    schema1:Name "Mood" ;
+    schema1:Track <spotify:track:6rqhFgbbKwnb9MLmUQDhG61> .
 
-<spotify:genre:rock> a schema1:Genre ;
-    schema1:Name "Rock" .
+<spotify:playlist:37i9dQZF1DXcBWIGoYBM5M2> a schema1:MusicPlaylist ;
+    ns1:modified_at 423543656 ;
+    ns1:num_albums 1 ;
+    ns1:num_followers 231231224 ;
+    ns1:num_tracks 1 ;
+    schema1:Name "Mood" ;
+    schema1:Track <spotify:track:6rqhFgbbKwnb9MLmUQDhG62> .
 
-<spotify:track:6rqhFgbbKwnb9MLmUQDhG6> a schema1:MusicRecording ;
+<spotify:playlist:37i9dQZF1DXcBWIGoYBM5M3> a schema1:MusicPlaylist ;
+    ns1:modified_at 423543656 ;
+    ns1:num_albums 1 ;
+    ns1:num_followers 231231224 ;
+    ns1:num_tracks 1 ;
+    schema1:Name "Mood" ;
+    schema1:Track <spotify:track:6rqhFgbbKwnb9MLmUQDhG63> .
+
+<spotify:playlist:37i9dQZF1DXcBWIGoYBM5M4> a schema1:MusicPlaylist ;
+    ns1:modified_at 423543656 ;
+    ns1:num_albums 1 ;
+    ns1:num_followers 231231224 ;
+    ns1:num_tracks 1 ;
+    schema1:Name "Mood" ;
+    schema1:Track <spotify:track:6rqhFgbbKwnb9MLmUQDhG64> .
+
+<spotify:playlist:37i9dQZF1DXcBWIGoYBM5M5> a schema1:MusicPlaylist ;
+    ns1:modified_at 423543656 ;
+    ns1:num_albums 1 ;
+    ns1:num_followers 231231224 ;
+    ns1:num_tracks 1 ;
+    schema1:Name "Mood" ;
+    schema1:Track <spotify:track:6rqhFgbbKwnb9MLmUQDhG65> .
+
+<spotify:playlist:37i9dQZF1DXcBWIGoYBM5M6> a schema1:MusicPlaylist ;
+    ns1:modified_at 423543656 ;
+    ns1:num_albums 1 ;
+    ns1:num_followers 231231224 ;
+    ns1:num_tracks 1 ;
+    schema1:Name "Mood" ;
+    schema1:Track <spotify:track:6rqhFgbbKwnb9MLmUQDhG66> .
+
+<spotify:playlist:37i9dQZF1DXcBWIGoYBM5M7> a schema1:MusicPlaylist ;
+    ns1:modified_at 423543656 ;
+    ns1:num_albums 1 ;
+    ns1:num_followers 231231224 ;
+    ns1:num_tracks 1 ;
+    schema1:Name "Mood" ;
+    schema1:Track <spotify:track:6rqhFgbbKwnb9MLmUQDhG67> .
+
+<spotify:playlist:37i9dQZF1DXcBWIGoYBM5M8> a schema1:MusicPlaylist ;
+    ns1:modified_at 423543656 ;
+    ns1:num_albums 1 ;
+    ns1:num_followers 231231224 ;
+    ns1:num_tracks 1 ;
+    schema1:Name "Mood" ;
+    schema1:Track <spotify:track:6rqhFgbbKwnb9MLmUQDhG68> .
+
+<spotify:playlist:37i9dQZF1DXcBWIGoYBM5M9> a schema1:MusicPlaylist ;
+    ns1:modified_at 423543656 ;
+    ns1:num_albums 1 ;
+    ns1:num_followers 231231224 ;
+    ns1:num_tracks 1 ;
+    schema1:Name "Mood" ;
+    schema1:Track <spotify:track:6rqhFgbbKwnb9MLmUQDhG69> .
+
+<spotify:album:1ATL5GLyefJaxhQzSPVrLX0> a schema1:MusicAlbum ;
+    schema1:Name "BE0" ;
+    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX0> .
+
+<spotify:album:1ATL5GLyefJaxhQzSPVrLX1> a schema1:MusicAlbum ;
+    schema1:Name "BE1" ;
+    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX1> .
+
+<spotify:album:1ATL5GLyefJaxhQzSPVrLX2> a schema1:MusicAlbum ;
+    schema1:Name "BE2" ;
+    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX2> .
+
+<spotify:album:1ATL5GLyefJaxhQzSPVrLX3> a schema1:MusicAlbum ;
+    schema1:Name "BE3" ;
+    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX3> .
+
+<spotify:album:1ATL5GLyefJaxhQzSPVrLX4> a schema1:MusicAlbum ;
+    schema1:Name "BE4" ;
+    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX4> .
+
+<spotify:album:1ATL5GLyefJaxhQzSPVrLX5> a schema1:MusicAlbum ;
+    schema1:Name "BE5" ;
+    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX5> .
+
+<spotify:album:1ATL5GLyefJaxhQzSPVrLX6> a schema1:MusicAlbum ;
+    schema1:Name "BE6" ;
+    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX6> .
+
+<spotify:album:1ATL5GLyefJaxhQzSPVrLX7> a schema1:MusicAlbum ;
+    schema1:Name "BE7" ;
+    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX7> .
+
+<spotify:album:1ATL5GLyefJaxhQzSPVrLX8> a schema1:MusicAlbum ;
+    schema1:Name "BE8" ;
+    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX8> .
+
+<spotify:album:1ATL5GLyefJaxhQzSPVrLX9> a schema1:MusicAlbum ;
+    schema1:Name "BE9" ;
+    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX9> .
+
+<spotify:track:6rqhFgbbKwnb9MLmUQDhG60> a schema1:MusicRecording ;
     ns1:acousticness 1.66e-03 ;
     ns1:danceability 4.23e-01 ;
     ns1:duration 123 ;
@@ -29,13 +134,223 @@
     ns1:speechiness 6.35e-02 ;
     ns1:tempo 1.49934e+02 ;
     ns1:valence 5.05e-01 ;
-    schema1:Name "Dynamite" ;
-    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX> ;
-    schema1:inAlbum <spotify:album:1ATL5GLyefJaxhQzSPVrLX> .
+    schema1:Name "Dynamite0" ;
+    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX0> ;
+    schema1:inAlbum <spotify:album:1ATL5GLyefJaxhQzSPVrLX0> .
 
-<spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX> a schema1:MusicGroup ;
+<spotify:track:6rqhFgbbKwnb9MLmUQDhG61> a schema1:MusicRecording ;
+    ns1:acousticness 1.66e-03 ;
+    ns1:danceability 4.23e-01 ;
+    ns1:duration 123 ;
+    ns1:energy 9.4e-01 ;
+    ns1:instrumentalness 0 ;
+    ns1:liveness 1.78e-01 ;
+    ns1:loudness -4.012e+00 ;
+    ns1:pos 1 ;
+    ns1:speechiness 6.35e-02 ;
+    ns1:tempo 1.49934e+02 ;
+    ns1:valence 5.05e-01 ;
+    schema1:Name "Dynamite1" ;
+    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX1> ;
+    schema1:inAlbum <spotify:album:1ATL5GLyefJaxhQzSPVrLX1> .
+
+<spotify:track:6rqhFgbbKwnb9MLmUQDhG62> a schema1:MusicRecording ;
+    ns1:acousticness 1.66e-03 ;
+    ns1:danceability 4.23e-01 ;
+    ns1:duration 123 ;
+    ns1:energy 9.4e-01 ;
+    ns1:instrumentalness 0 ;
+    ns1:liveness 1.78e-01 ;
+    ns1:loudness -4.012e+00 ;
+    ns1:pos 1 ;
+    ns1:speechiness 6.35e-02 ;
+    ns1:tempo 1.49934e+02 ;
+    ns1:valence 5.05e-01 ;
+    schema1:Name "Dynamite2" ;
+    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX2> ;
+    schema1:inAlbum <spotify:album:1ATL5GLyefJaxhQzSPVrLX2> .
+
+<spotify:track:6rqhFgbbKwnb9MLmUQDhG63> a schema1:MusicRecording ;
+    ns1:acousticness 1.66e-03 ;
+    ns1:danceability 4.23e-01 ;
+    ns1:duration 123 ;
+    ns1:energy 9.4e-01 ;
+    ns1:instrumentalness 0 ;
+    ns1:liveness 1.78e-01 ;
+    ns1:loudness -4.012e+00 ;
+    ns1:pos 1 ;
+    ns1:speechiness 6.35e-02 ;
+    ns1:tempo 1.49934e+02 ;
+    ns1:valence 5.05e-01 ;
+    schema1:Name "Dynamite3" ;
+    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX3> ;
+    schema1:inAlbum <spotify:album:1ATL5GLyefJaxhQzSPVrLX3> .
+
+<spotify:track:6rqhFgbbKwnb9MLmUQDhG64> a schema1:MusicRecording ;
+    ns1:acousticness 1.66e-03 ;
+    ns1:danceability 4.23e-01 ;
+    ns1:duration 123 ;
+    ns1:energy 9.4e-01 ;
+    ns1:instrumentalness 0 ;
+    ns1:liveness 1.78e-01 ;
+    ns1:loudness -4.012e+00 ;
+    ns1:pos 1 ;
+    ns1:speechiness 6.35e-02 ;
+    ns1:tempo 1.49934e+02 ;
+    ns1:valence 5.05e-01 ;
+    schema1:Name "Dynamite4" ;
+    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX4> ;
+    schema1:inAlbum <spotify:album:1ATL5GLyefJaxhQzSPVrLX4> .
+
+<spotify:track:6rqhFgbbKwnb9MLmUQDhG65> a schema1:MusicRecording ;
+    ns1:acousticness 1.66e-03 ;
+    ns1:danceability 4.23e-01 ;
+    ns1:duration 123 ;
+    ns1:energy 9.4e-01 ;
+    ns1:instrumentalness 0 ;
+    ns1:liveness 1.78e-01 ;
+    ns1:loudness -4.012e+00 ;
+    ns1:pos 1 ;
+    ns1:speechiness 6.35e-02 ;
+    ns1:tempo 1.49934e+02 ;
+    ns1:valence 5.05e-01 ;
+    schema1:Name "Dynamite5" ;
+    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX5> ;
+    schema1:inAlbum <spotify:album:1ATL5GLyefJaxhQzSPVrLX5> .
+
+<spotify:track:6rqhFgbbKwnb9MLmUQDhG66> a schema1:MusicRecording ;
+    ns1:acousticness 1.66e-03 ;
+    ns1:danceability 4.23e-01 ;
+    ns1:duration 123 ;
+    ns1:energy 9.4e-01 ;
+    ns1:instrumentalness 0 ;
+    ns1:liveness 1.78e-01 ;
+    ns1:loudness -4.012e+00 ;
+    ns1:pos 1 ;
+    ns1:speechiness 6.35e-02 ;
+    ns1:tempo 1.49934e+02 ;
+    ns1:valence 5.05e-01 ;
+    schema1:Name "Dynamite6" ;
+    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX6> ;
+    schema1:inAlbum <spotify:album:1ATL5GLyefJaxhQzSPVrLX6> .
+
+<spotify:track:6rqhFgbbKwnb9MLmUQDhG67> a schema1:MusicRecording ;
+    ns1:acousticness 1.66e-03 ;
+    ns1:danceability 4.23e-01 ;
+    ns1:duration 123 ;
+    ns1:energy 9.4e-01 ;
+    ns1:instrumentalness 0 ;
+    ns1:liveness 1.78e-01 ;
+    ns1:loudness -4.012e+00 ;
+    ns1:pos 1 ;
+    ns1:speechiness 6.35e-02 ;
+    ns1:tempo 1.49934e+02 ;
+    ns1:valence 5.05e-01 ;
+    schema1:Name "Dynamite7" ;
+    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX7> ;
+    schema1:inAlbum <spotify:album:1ATL5GLyefJaxhQzSPVrLX7> .
+
+<spotify:track:6rqhFgbbKwnb9MLmUQDhG68> a schema1:MusicRecording ;
+    ns1:acousticness 1.66e-03 ;
+    ns1:danceability 4.23e-01 ;
+    ns1:duration 123 ;
+    ns1:energy 9.4e-01 ;
+    ns1:instrumentalness 0 ;
+    ns1:liveness 1.78e-01 ;
+    ns1:loudness -4.012e+00 ;
+    ns1:pos 1 ;
+    ns1:speechiness 6.35e-02 ;
+    ns1:tempo 1.49934e+02 ;
+    ns1:valence 5.05e-01 ;
+    schema1:Name "Dynamite8" ;
+    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX8> ;
+    schema1:inAlbum <spotify:album:1ATL5GLyefJaxhQzSPVrLX8> .
+
+<spotify:track:6rqhFgbbKwnb9MLmUQDhG69> a schema1:MusicRecording ;
+    ns1:acousticness 1.66e-03 ;
+    ns1:danceability 4.23e-01 ;
+    ns1:duration 123 ;
+    ns1:energy 9.4e-01 ;
+    ns1:instrumentalness 0 ;
+    ns1:liveness 1.78e-01 ;
+    ns1:loudness -4.012e+00 ;
+    ns1:pos 1 ;
+    ns1:speechiness 6.35e-02 ;
+    ns1:tempo 1.49934e+02 ;
+    ns1:valence 5.05e-01 ;
+    schema1:Name "Dynamite9" ;
+    schema1:byArtist <spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX9> ;
+    schema1:inAlbum <spotify:album:1ATL5GLyefJaxhQzSPVrLX9> .
+
+<spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX0> a schema1:MusicGroup ;
     ns1:num_followers 5 ;
     ns1:popularity 80 ;
-    schema1:Name "BTS" ;
+    schema1:Name "BTS0" ;
     schema1:genre <spotify:genre:rock> .
+
+<spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX1> a schema1:MusicGroup ;
+    ns1:num_followers 5 ;
+    ns1:popularity 80 ;
+    schema1:Name "BTS1" ;
+    schema1:genre <spotify:genre:rock> .
+
+<spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX2> a schema1:MusicGroup ;
+    ns1:num_followers 5 ;
+    ns1:popularity 80 ;
+    schema1:Name "BTS2" ;
+    schema1:genre <spotify:genre:rock> .
+
+<spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX3> a schema1:MusicGroup ;
+    ns1:num_followers 5 ;
+    ns1:popularity 80 ;
+    schema1:Name "BTS3" ;
+    schema1:genre <spotify:genre:rock> .
+
+<spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX4> a schema1:MusicGroup ;
+    ns1:num_followers 5 ;
+    ns1:popularity 80 ;
+    schema1:Name "BTS4" ;
+    schema1:genre <spotify:genre:rock> .
+
+<spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX5> a schema1:MusicGroup ;
+    ns1:num_followers 5 ;
+    ns1:popularity 80 ;
+    schema1:Name "BTS5" ;
+    schema1:genre <spotify:genre:rock> .
+
+<spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX6> a schema1:MusicGroup ;
+    ns1:num_followers 5 ;
+    ns1:popularity 80 ;
+    schema1:Name "BTS6" ;
+    schema1:genre <spotify:genre:rock> .
+
+<spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX7> a schema1:MusicGroup ;
+    ns1:num_followers 5 ;
+    ns1:popularity 80 ;
+    schema1:Name "BTS7" ;
+    schema1:genre <spotify:genre:rock> .
+
+<spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX8> a schema1:MusicGroup ;
+    ns1:num_followers 5 ;
+    ns1:popularity 80 ;
+    schema1:Name "BTS8" ;
+    schema1:genre <spotify:genre:rock> .
+
+<spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX9> a schema1:MusicGroup ;
+    ns1:num_followers 5 ;
+    ns1:popularity 80 ;
+    schema1:Name "BTS9" ;
+    schema1:genre <spotify:genre:rock> .
+
+<spotify:genre:rock> a schema1:Genre ;
+    schema1:Name "Rock0",
+        "Rock1",
+        "Rock2",
+        "Rock3",
+        "Rock4",
+        "Rock5",
+        "Rock6",
+        "Rock7",
+        "Rock8",
+        "Rock9" .
 

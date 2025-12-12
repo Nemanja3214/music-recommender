@@ -1,8 +1,5 @@
 import json
 import os
-import sqlite3
-import time
-from typing import Optional, List, Tuple
 
 import requests
 
