@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn import TripletMarginLoss
 from torch_geometric.loader import NeighborLoader, LinkNeighborLoader
 from torch_geometric.nn import SAGEConv, HeteroConv
 from torch_geometric.data import HeteroData
@@ -133,7 +134,6 @@ class HeteroGNN(nn.Module):
 if __name__ == "__main__":
     builder = SpotifyHeteroGraphBuilder()
     data, nodes_id_map = builder.run()
-    # pw_graphs = build_pixiewalk_graphs(train_data)
 
     print_pyg_diagnostics(data)
 
@@ -147,7 +147,8 @@ if __name__ == "__main__":
         is_undirected=True,
         add_negative_train_samples=True,
         neg_sampling_ratio=1.0,
-        edge_types=[("Playlist" ,"Has Track", "Track")]
+        edge_types=[("Playlist" ,"Has Track", "Track")],
+        rev_edge_types=[('Track', 'rev_Has Track', 'Playlist')]
     )
     train_data, val_data, test_data = split(data)
     print(train_data)
@@ -176,49 +177,78 @@ if __name__ == "__main__":
     # Node counts for negative sampling
     node_counts = {ntype: data[ntype].num_nodes for ntype in data.node_types}
 
-    batch_size = 128
+    batch_size = 10
     device = 'cpu'
     epochs = 50
     num_neighbors = [10, 10]
     neg_ratio = 1
     seed_node_type = None
+    target_edge = "Playlist" ,"Has Track", "Track"
+
+    train_edge_label_index = train_data[target_edge].edge_label_index
+    train_edge_label = train_data[target_edge].edge_label
+
+    val_edge_label_index = val_data[target_edge].edge_label_index
+    val_edge_label = val_data[target_edge].edge_label
+
+    test_edge_label_index = test_data[target_edge].edge_label_index
+    test_edge_label = test_data[target_edge].edge_label
 
     trainloader = LinkNeighborLoader(
         train_data,
         batch_size=batch_size,
         shuffle=True,
-        edge_label_index=("Playlist" ,"Has Track", "Track"),
+        edge_label_index=(target_edge, train_edge_label_index),
+        edge_label=train_edge_label,
         num_neighbors=num_neighbors,
     )
     valloader = LinkNeighborLoader(
         val_data,
         batch_size=batch_size,
         shuffle=False,
-        edge_label_index=("Playlist" ,"Has Track", "Track"),
+        edge_label_index=(target_edge, val_edge_label_index),
+        edge_label=val_edge_label,
         num_neighbors=num_neighbors,
     )
     testloader = LinkNeighborLoader(
         test_data,
         batch_size=batch_size,
         shuffle=False,
-        edge_label_index=("Playlist" ,"Has Track", "Track"),
+        edge_label_index=(target_edge, test_edge_label_index),
+        edge_label=test_edge_label,
         num_neighbors=num_neighbors,
     )
+    criterion = nn.TripletMarginLoss(margin=1.0)
 
-    # for epoch in range(1, epochs + 1):
-    #     model.train()
-    #     total_loss_epoch = 0.0
-    #     total_pos_epoch = 0
-    #     total_neg_epoch = 0
-    #
-    #     optimizer.zero_grad()
-    #
-    #     embedding = model(train_data.x, train_data.edge_index)
-    #     neg_edge_index = negative_sampling(
-    #         edge_index=train_data.edge_index, num_nodes=train_data.num_nodes,
-    #         num_neg_samples=train_data.edge_label_index.size(1), method='sparse')
-    #
-    #     total_loss = 0.0
+    for epoch in range(1, epochs + 1):
+        model.train()
+        total_loss_epoch = 0.0
+        total_pos_epoch = 0
+        total_neg_epoch = 0
+
+        optimizer.zero_grad()
+        for batch in trainloader:
+
+            print(batch)
+            print(type(batch))
+            # out is embedding dict
+            selected_batch = batch[target_edge]
+            positive_edges_index = selected_batch.edge_label_index[:, selected_batch.edge_label == 1]
+            negative_edges_index = selected_batch.edge_label_index[:, selected_batch.edge_label == 0]
+            print("POSITIVE" + str(positive_edges_index))
+            print("NEGATIVE" + str(negative_edges_index))
+            exit()
+
+            out = model(batch.x_dict, batch.edge_index_dict)
+            # print(embedding)
+
+            batch_loss = 0.0
+            # mask = data["Track"].train_mask
+            ground_truth = batch["Playlist" ,"Has Track", "Track"].edge_label
+            loss = criterion()
+            loss.backward()
+            optimizer.step()
+            print(float(loss))
     #             edge_index = batch[(src_type, rel, dst_type)].edge_index
     #             if edge_index is None or edge_index.size(1) == 0:
     #                 continue
