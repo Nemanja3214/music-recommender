@@ -164,7 +164,6 @@ if __name__ == "__main__":
 
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-5)
-    bce = nn.BCEWithLogitsLoss()
 
     # Move all data to device
     for ntype in data.node_types:
@@ -235,6 +234,7 @@ if __name__ == "__main__":
             selected_batch = batch[target_edge]
             positive_edges_index = selected_batch.edge_label_index[:, selected_batch.edge_label == 1]
             negative_edges_index = selected_batch.edge_label_index[:, selected_batch.edge_label == 0]
+            print(selected_batch)
             print("POSITIVE" + str(positive_edges_index))
             print("NEGATIVE" + str(negative_edges_index))
             exit()
