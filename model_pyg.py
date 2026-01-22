@@ -1,19 +1,14 @@
-import math
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn import TripletMarginLoss
 from torch_geometric.loader import NeighborLoader, LinkNeighborLoader
 from torch_geometric.nn import SAGEConv, HeteroConv
-from torch_geometric.data import HeteroData
-import numpy as np
 import torch_geometric.transforms as T
-from torch_geometric.utils import negative_sampling
 
 from torch_geometric.data import HeteroData
 from build_graph_network import SpotifyHeteroGraphBuilder
 from collections import defaultdict
+import matplotlib.pyplot as plt
 
 import torch_sparse
 print(torch_sparse.__version__)
@@ -121,6 +116,7 @@ class HeteroGNN(nn.Module):
         x_dict = self.conv2(x_dict, edge_index_dict)
         # print("CONV2 ===================================================")
         # print(x_dict)
+        # TODO add residual connection
         x_dict = {k: F.relu(v) for k, v in x_dict.items()}
 
 
@@ -150,7 +146,7 @@ if __name__ == "__main__":
         num_test=0.1,
         is_undirected=True,
         add_negative_train_samples=True,
-        neg_sampling_ratio=4,
+        neg_sampling_ratio=70,
         edge_types=[("Playlist" ,"Has Track", "Track")],
         rev_edge_types=[('Track', 'rev_Has Track', 'Playlist')]
     )
@@ -185,9 +181,8 @@ if __name__ == "__main__":
 
     batch_size = 30
     device = 'cpu'
-    epochs = 10
+    epochs = 100
     num_neighbors = [10, 10]
-    neg_ratio = 1
     seed_node_type = None
     target_edge = "Playlist" ,"Has Track", "Track"
 
@@ -348,8 +343,8 @@ if __name__ == "__main__":
         print(f"Epoch {epoch:03d} | Loss: {total_loss_epoch:.4f}"
               f"Skipped {skipped_count}/{batch_count}")
         epoch_losses.append(total_loss_epoch)
-    epoch_losses = [math.log(x) for x in epoch_losses]
-    import matplotlib.pyplot as plt
+    # epoch_losses = [math.log(x) for x in epoch_losses]
+
 
     plt.plot(epoch_losses)
     plt.xlabel("Epoch")
@@ -391,7 +386,7 @@ if __name__ == "__main__":
         for pid, tid in zip(p_idx_pos.tolist(), t_idx_pos.tolist()):
             gt_tracks_by_playlist[pid].append(tid)
 
-        K = 10
+        K = 20
         hit_count = 0
         recall_sum = 0
         num_playlists = len(gt_tracks_by_playlist)
@@ -422,13 +417,3 @@ if __name__ == "__main__":
 
         print(f"Hit Rate@{K} (restricted to training tracks): {hit_rate:.4f}")
         print(f"Recall@{K} (restricted to training tracks): {recall_at_k:.4f}")
-
-    #
-    # # Train
-    # # data_trained = train_link_reconstruction(data, model,
-    # #                                         device=device,
-    # #                                         epochs=50,
-    # #                                         neg_ratio=1)
-    #
-    # print("Learned embedding shape for first node type:",
-    #       data[data.node_types[0]].emb.shape)
