@@ -154,6 +154,7 @@ class SpotifyHeteroGraphBuilder:
 
             # assign features to PyG node type
             data[ntype].x = mat
+            data[ntype].ids = id_map.values()
             data[ntype].num_nodes = num_nodes
 
         return data

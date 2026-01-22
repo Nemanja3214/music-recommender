@@ -166,7 +166,7 @@ class SpotifyMusicGraphSchema:
 # ===== Example usage =====
 if __name__ == "__main__":
     smg = SpotifyMusicGraphSchema()
-
+    tracks = []
     for i in range(10):
         i_str = str(i)
         rock = smg.add_genre("spotify:genre:rock", "Rock"+i_str)
@@ -188,11 +188,17 @@ if __name__ == "__main__":
             "duration": 123,
             "pos": 1
         })
+        tracks.append(track1)
         # track2 = smg.add_track("spotify:track:0eGsygTp906u18L0Oimnem", "Butter", album_uri=be_album, artists_uri=bts)
         playlist = smg.add_playlist("spotify:playlist:37i9dQZF1DXcBWIGoYBM5M"+i_str, [track1],"Mood", {
         "modified_at": 423543656,
         "num_tracks": 1,
         "num_albums": 1,
         "num_followers": 231231224})
-    smg.visualize_rdf_graph()
+    playlist = smg.add_playlist("spotify:playlist:37i9dQZF1DXcBWIGoYBM5Mscacqcq" + i_str, tracks, "All", {
+        "modified_at": 423543656,
+        "num_tracks": 10,
+        "num_albums": 1,
+        "num_followers": 231231224})
+    # smg.visualize_rdf_graph()
     smg.serialize()

@@ -13,7 +13,7 @@ def iter_mpd_playlists(mpd_dir: str, n=None):
         files = sorted(files)[:n]
 
     print(f"There is {len(files)} files")
-    for fp in files:
+    for fp in files[200:]:
         with open(fp, 'r', encoding='utf-8') as fh:
             try:
                 data = json.load(fh)
