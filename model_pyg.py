@@ -66,9 +66,51 @@ def print_pyg_diagnostics(data: HeteroData):
               f"dst_dim={None if dst_x is None else dst_x.size(1)}")
     print("\n================ END DIAGNOSTICS ================\n")
 
-# -------------------------
-# Hetero GNN model (build convs from given relation list)
-# -------------------------
+def print_playlist_track_ranking(builder, train_tracks_by_playlist, playlist_emb, track_emb, K=20):
+    from collections import defaultdict
+    import torch
+
+    # Mapping from IDs to names
+    playlist_names_map = {v: builder.node_names.get(k, f"Playlist_{v}")
+                          for k, v in builder.nodes_id_map['Playlist'].items()}
+    track_names_map = {v: builder.node_names.get(k, f"Track_{v}")
+                       for k, v in builder.nodes_id_map['Track'].items()}
+
+    print("\n===== PLAYLIST TRACK RANKINGS =====\n")
+
+    for pid, connected_tids in train_tracks_by_playlist.items():
+        p_vec = playlist_emb[pid].unsqueeze(0)  # [1, embed_dim]
+        sims = torch.matmul(p_vec, track_emb.t()).squeeze(0)  # similarity with all tracks
+
+        # --- Connected tracks ---
+        connected_tracks = [track_names_map[i] for i in connected_tids]
+        train_sims = sims[list(connected_tids)] if connected_tids else torch.tensor([])
+        print(f"Playlist: {playlist_names_map.get(pid, f'Playlist_{pid}')} (ID {pid})")
+        print(f"  Connected tracks ({len(connected_tracks)}): {connected_tracks}")
+        if len(train_sims) > 0:
+            print(f"  Max similarity among connected: {train_sims.max().item():.3f}")
+            print(f"  Min similarity among connected: {train_sims.min().item():.3f}")
+
+        # --- Top K including connected tracks ---
+        topk_vals_all, topk_index_all = torch.topk(sims, K)
+        topk_tracks_all = [track_names_map[i.item()] for i in topk_index_all]
+        print(f"  Top {K} tracks (including connected): {topk_tracks_all}")
+
+        # --- Top K excluding connected tracks ---
+        if connected_tids:
+            mask = torch.ones_like(sims, dtype=torch.bool)
+            mask[list(connected_tids)] = 0
+            sims_masked = sims.clone()
+            sims_masked[~mask] = -float('inf')
+        else:
+            sims_masked = sims
+
+        topk_vals_masked, topk_index_masked = torch.topk(sims_masked, K)
+        topk_tracks_masked = [track_names_map[i.item()] for i in topk_index_masked]
+        print(f"  Top {K} tracks (excluding connected): {topk_tracks_masked}\n")
+
+
+
 class HeteroGNN(nn.Module):
     def __init__(self, metadata, in_channels_dict, hidden_channels=256, out_channels=128, dropout=0.2):
         super().__init__()
@@ -128,103 +170,6 @@ class HeteroGNN(nn.Module):
         out = {k: self.post_lin[k](v) for k, v in x2.items()}
 
         return out
-
-# ------------------------------
-# SIMPLE PLUG-IN DIAGNOSTIC FUNCTION
-# ------------------------------
-def diagnose_batch(model, batch, target_edge, device):
-    import torch
-    import torch.nn.functional as F
-
-    batch = batch.to(device)
-    model.zero_grad()
-
-    out = model(batch.x_dict, batch.edge_index_dict)
-
-    p_idx, t_idx = batch[target_edge].edge_label_index
-    labels = batch[target_edge].edge_label
-
-    z_p = out['Playlist'][p_idx]
-    z_t = out['Track'][t_idx]
-    scores = (z_p * z_t).sum(dim=1)
-
-    # group by playlist
-    from collections import defaultdict
-    pos_by_p = defaultdict(list)
-    neg_by_p = defaultdict(list)
-
-    for i in range(len(scores)):
-        pid = p_idx[i].item()
-        if labels[i] == 1:
-            pos_by_p[pid].append(scores[i])
-        else:
-            neg_by_p[pid].append(scores[i])
-
-    pos_scores = []
-    neg_scores = []
-    for pid in pos_by_p:
-        if pid not in neg_by_p:
-            continue
-        for ps in pos_by_p[pid]:
-            ns = neg_by_p[pid][torch.randint(0, len(neg_by_p[pid]), (1,))]
-            pos_scores.append(ps)
-            neg_scores.append(ns)
-
-    if len(pos_scores) == 0:
-        print("⚠ No valid pos-neg pairs in batch")
-        return
-
-    pos_scores = torch.stack(pos_scores)
-    neg_scores = torch.stack(neg_scores)
-
-    loss = F.softplus(-(pos_scores - neg_scores)).mean()
-    loss.backward()
-
-    print("\n================ DIAGNOSTICS ================\n")
-
-    print("=== EMBEDDINGS ===")
-    print(f"Playlist std={z_p.std():.4f}, mean={z_p.mean():.4f}")
-    print(f"Track    std={z_t.std():.4f}, mean={z_t.mean():.4f}")
-
-    print("\n=== SCORES ===")
-    print(f"BPR loss: {loss.item():.4f}")
-    print(f"Pos mean={pos_scores.mean():.4f}, std={pos_scores.std():.4f}")
-    print(f"Neg mean={neg_scores.mean():.4f}, std={neg_scores.std():.4f}")
-    print(f"Margin (pos-neg): {(pos_scores.mean() - neg_scores.mean()):.4f}")
-
-    print("\n=== SCORE HEALTH ===")
-    print(f"Frac(pos > neg): {(pos_scores > neg_scores).float().mean():.3f}")
-    print(f"Frac(margin > 1): {((pos_scores - neg_scores) > 1).float().mean():.3f}")
-
-    print("\n=== GRADIENT FLOW ===")
-    dead = []
-    tiny = []
-
-    for name, p in model.named_parameters():
-        if p.grad is None:
-            dead.append(name)
-        else:
-            g = p.grad
-            maxg = g.abs().max().item()
-            print(f"{name}: std={g.std():.2e}, max={maxg:.2e}")
-            if maxg < 1e-7:
-                tiny.append(name)
-
-    print(f"\nDead tensors: {len(dead)}")
-    if dead:
-        print("Dead layers:")
-        for d in dead:
-            print(" ", d)
-
-    if tiny:
-        print("\nNear-zero gradient layers:")
-        for t in tiny:
-            print(" ", t)
-
-    print("\n=============================================\n")
-
-
-
 
 # -------------------------
 # Main usage
@@ -511,3 +456,4 @@ if __name__ == "__main__":
 
         print(f"Hit Rate@{K}: {hit_rate:.4f}")
         print(f"Recall@{K}: {recall_at_k:.4f}")
+        print_playlist_track_ranking(builder, train_tracks_by_playlist, playlist_emb, track_emb, K=20)
