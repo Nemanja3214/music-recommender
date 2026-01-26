@@ -1,3 +1,5 @@
+import os
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -9,9 +11,6 @@ from torch_geometric.data import HeteroData
 from build_graph_network import SpotifyHeteroGraphBuilder
 from collections import defaultdict
 import matplotlib.pyplot as plt
-
-import torch_sparse
-print(torch_sparse.__version__)
 
 # -------------------------
 # Diagnostics / utils
@@ -98,6 +97,12 @@ class HeteroGNN(nn.Module):
             },
             aggr='mean'
         )
+        self.norm1 = nn.ModuleDict({nt: nn.LayerNorm(hidden_channels) for nt in metadata[0]})
+        self.norm2 = nn.ModuleDict({nt: nn.LayerNorm(out_channels) for nt in metadata[0]})
+
+        self.res_proj = nn.ModuleDict({
+            ntype: nn.Linear(hidden_channels, out_channels) for ntype in node_types
+        })
 
         self.post_lin = nn.ModuleDict()
         for ntype in self.node_types:
@@ -105,27 +110,120 @@ class HeteroGNN(nn.Module):
         print(self)
 
     def forward(self, x_dict, edge_index_dict):
-        # print("DATA ===================================================")
-        # print(x_dict)
-        x_dict = self.conv1(x_dict, edge_index_dict)
-        # print("CONV1 ===================================================")
-        # print(x_dict)
-        x_dict = {k: F.relu(v) for k, v in x_dict.items()}
-        # x_dict = {k: F.dropout(v, p=self.dropout, training=self.training) for k, v in x_dict.items()}
+        # ----- Conv1: input -> hidden -----
+        x1 = self.conv1(x_dict, edge_index_dict)
+        x1 = {
+            k: F.dropout(F.relu(self.norm1[k](v)), p=self.dropout, training=self.training)
+            for k, v in x1.items()
+        }
 
-        x_dict = self.conv2(x_dict, edge_index_dict)
-        # print("CONV2 ===================================================")
-        # print(x_dict)
-        # TODO add residual connection
-        x_dict = {k: F.relu(v) for k, v in x_dict.items()}
+        # ----- Conv2: hidden -> out with residual -----
+        x2 = self.conv2(x1, edge_index_dict)
+        x2 = {
+            k: self.norm2[k](v + self.res_proj[k](x1[k]))
+            for k, v in x2.items()
+        }
 
+        # ----- Optional final linear projection -----
+        out = {k: self.post_lin[k](v) for k, v in x2.items()}
 
-        out = {}
-        for ntype, emb in x_dict.items():
-            out[ntype] = self.post_lin[ntype](emb)
-        # print("OUT ===================================================")
-        # print(out)
         return out
+
+# ------------------------------
+# SIMPLE PLUG-IN DIAGNOSTIC FUNCTION
+# ------------------------------
+def diagnose_batch(model, batch, target_edge, device):
+    import torch
+    import torch.nn.functional as F
+
+    batch = batch.to(device)
+    model.zero_grad()
+
+    out = model(batch.x_dict, batch.edge_index_dict)
+
+    p_idx, t_idx = batch[target_edge].edge_label_index
+    labels = batch[target_edge].edge_label
+
+    z_p = out['Playlist'][p_idx]
+    z_t = out['Track'][t_idx]
+    scores = (z_p * z_t).sum(dim=1)
+
+    # group by playlist
+    from collections import defaultdict
+    pos_by_p = defaultdict(list)
+    neg_by_p = defaultdict(list)
+
+    for i in range(len(scores)):
+        pid = p_idx[i].item()
+        if labels[i] == 1:
+            pos_by_p[pid].append(scores[i])
+        else:
+            neg_by_p[pid].append(scores[i])
+
+    pos_scores = []
+    neg_scores = []
+    for pid in pos_by_p:
+        if pid not in neg_by_p:
+            continue
+        for ps in pos_by_p[pid]:
+            ns = neg_by_p[pid][torch.randint(0, len(neg_by_p[pid]), (1,))]
+            pos_scores.append(ps)
+            neg_scores.append(ns)
+
+    if len(pos_scores) == 0:
+        print("⚠ No valid pos-neg pairs in batch")
+        return
+
+    pos_scores = torch.stack(pos_scores)
+    neg_scores = torch.stack(neg_scores)
+
+    loss = F.softplus(-(pos_scores - neg_scores)).mean()
+    loss.backward()
+
+    print("\n================ DIAGNOSTICS ================\n")
+
+    print("=== EMBEDDINGS ===")
+    print(f"Playlist std={z_p.std():.4f}, mean={z_p.mean():.4f}")
+    print(f"Track    std={z_t.std():.4f}, mean={z_t.mean():.4f}")
+
+    print("\n=== SCORES ===")
+    print(f"BPR loss: {loss.item():.4f}")
+    print(f"Pos mean={pos_scores.mean():.4f}, std={pos_scores.std():.4f}")
+    print(f"Neg mean={neg_scores.mean():.4f}, std={neg_scores.std():.4f}")
+    print(f"Margin (pos-neg): {(pos_scores.mean() - neg_scores.mean()):.4f}")
+
+    print("\n=== SCORE HEALTH ===")
+    print(f"Frac(pos > neg): {(pos_scores > neg_scores).float().mean():.3f}")
+    print(f"Frac(margin > 1): {((pos_scores - neg_scores) > 1).float().mean():.3f}")
+
+    print("\n=== GRADIENT FLOW ===")
+    dead = []
+    tiny = []
+
+    for name, p in model.named_parameters():
+        if p.grad is None:
+            dead.append(name)
+        else:
+            g = p.grad
+            maxg = g.abs().max().item()
+            print(f"{name}: std={g.std():.2e}, max={maxg:.2e}")
+            if maxg < 1e-7:
+                tiny.append(name)
+
+    print(f"\nDead tensors: {len(dead)}")
+    if dead:
+        print("Dead layers:")
+        for d in dead:
+            print(" ", d)
+
+    if tiny:
+        print("\nNear-zero gradient layers:")
+        for t in tiny:
+            print(" ", t)
+
+    print("\n=============================================\n")
+
+
 
 
 # -------------------------
@@ -134,6 +232,9 @@ class HeteroGNN(nn.Module):
 if __name__ == "__main__":
     builder = SpotifyHeteroGraphBuilder()
     data, nodes_id_map = builder.run()
+
+    pt = ("Playlist", "Has Track", "Track")
+    rev_pt = ("Track", "rev_Has Track", "Playlist")
 
     # print_pyg_diagnostics(data)
 
@@ -145,10 +246,12 @@ if __name__ == "__main__":
         num_val=0.0,
         num_test=0.1,
         is_undirected=True,
+        key="edge_label",
         add_negative_train_samples=True,
-        neg_sampling_ratio=70,
-        edge_types=[("Playlist" ,"Has Track", "Track")],
-        rev_edge_types=[('Track', 'rev_Has Track', 'Playlist')]
+        disjoint_train_ratio=0.0,
+        neg_sampling_ratio=20,
+        edge_types=[pt],
+        rev_edge_types=[rev_pt]
     )
     train_data, val_data, test_data = split(data)
     print("TRAIN")
@@ -166,7 +269,8 @@ if __name__ == "__main__":
                       dropout=0.2)
 
     model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-5)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
+
 
     # Move all data to device
     for ntype in train_data.node_types:
@@ -179,10 +283,9 @@ if __name__ == "__main__":
     # Node counts for negative sampling
     node_counts = {ntype: train_data[ntype].num_nodes for ntype in train_data.node_types}
 
-    batch_size = 30
-    device = 'cpu'
-    epochs = 100
-    num_neighbors = [10, 10]
+    batch_size = 256
+    epochs = 15
+    num_neighbors = [50, 25]
     seed_node_type = None
     target_edge = "Playlist" ,"Has Track", "Track"
 
@@ -196,45 +299,28 @@ if __name__ == "__main__":
     test_edge_label_index = test_data[target_edge].edge_label_index
     test_edge_label = test_data[target_edge].edge_label
 
-    # def check_edges_overlap():
-    #     train_edge_type = ('Playlist', 'Has Track', 'Track')
-    #     rev_train_edge_type = ('Track', 'rev_Has Track', 'Playlist')
-    #
-    #     # Original train edges
-    #     train_edges = set(
-    #         tuple(x.tolist()) for x in train_data[train_edge_type].edge_label_index.t()
-    #     )
-    #
-    #     # Add reversed edges
-    #     rev_train_edges = set(
-    #         (dst.item(), src.item())
-    #         for src, dst in train_data[rev_train_edge_type].edge_label_index.t()
-    #     )
-    #     all_train_edges = train_edges.union(rev_train_edges)
-    #
-    #     test_edge_type = ('Playlist', 'Has Track', 'Track')
-    #     rev_test_edge_type = ('Playlist', 'rev_Has Track', 'Track')
-    #
-    #     test_edges = set(
-    #         tuple(x.tolist()) for x in test_data[test_edge_type].edge_label_index.t()
-    #     )
-    #
-    #     # Include reversed test edges
-    #     rev_test_edges = set(
-    #         (dst.item(), src.item())
-    #         for src, dst in test_data[rev_test_edge_type].edge_label_index.t()
-    #     )
-    #     all_test_edges = test_edges.union(rev_test_edges)
-    #
-    #     overlap = all_train_edges.intersection(all_test_edges)
-    #     print(f"Number of overlapping edges (including reversed): {len(overlap)}")
-    #
-    #     if len(overlap) > 0:
-    #         print("Warning: Some test edges are also in the training set!")
-    #     else:
-    #         print("No overlap between train and test edges. ✅")
-    #
-    # check_edges_overlap()
+
+    def check_train_test_overlap(train_data, test_data, edge_type=('Playlist', 'Has Track', 'Track')):
+        # Train positives
+        train_mask = train_data[edge_type].edge_label == 1
+        train_edges = set(tuple(x.tolist()) for x in train_data[edge_type].edge_label_index[:, train_mask].t())
+
+        # Test positives
+        test_mask = test_data[edge_type].edge_label == 1
+        test_edges = set(tuple(x.tolist()) for x in test_data[edge_type].edge_label_index[:, test_mask].t())
+
+        # Include reversed edges
+        rev_train_edges = set((dst, src) for src, dst in train_edges)
+        rev_test_edges = set((dst, src) for src, dst in test_edges)
+
+        all_train_edges = train_edges.union(rev_train_edges)
+        all_test_edges = test_edges.union(rev_test_edges)
+
+        overlap = all_train_edges.intersection(all_test_edges)
+        print("Number of overlapping POSITIVE edges (including reversed):", len(overlap))
+
+
+    check_train_test_overlap(train_data, test_data)
 
     trainloader = LinkNeighborLoader(
         train_data,
@@ -274,6 +360,8 @@ if __name__ == "__main__":
         skipped_count = 0
 
         for batch in trainloader:
+            # diagnose_batch(model, batch, target_edge, device)
+            # exit()
             optimizer.zero_grad()
             batch_count += 1
             selected_batch = batch[target_edge]
@@ -288,9 +376,8 @@ if __name__ == "__main__":
             labels = batch[edge_type].edge_label
 
             # get corresponding playlists and tracks embeddings
-            z_p = F.normalize(out['Playlist'][p_idx], dim=1)
-            z_t = F.normalize(out['Track'][t_idx], dim=1)
-
+            z_p = out['Playlist'][p_idx]
+            z_t = out['Track'][t_idx]
             scores = (z_p * z_t).sum(dim=1)
 
             pos_by_playlist = defaultdict(list)
@@ -339,12 +426,9 @@ if __name__ == "__main__":
             # print(f"Batch loss {float(loss)}")
             total_loss_epoch += float(loss)
 
-        # if epoch % 5 == 0 or epoch == 1:
         print(f"Epoch {epoch:03d} | Loss: {total_loss_epoch:.4f}"
               f"Skipped {skipped_count}/{batch_count}")
         epoch_losses.append(total_loss_epoch)
-    # epoch_losses = [math.log(x) for x in epoch_losses]
-
 
     plt.plot(epoch_losses)
     plt.xlabel("Epoch")
@@ -357,20 +441,24 @@ if __name__ == "__main__":
     print(f"STD playlist: {out['Playlist'].std(dim=0).mean()}")
 
     model.eval()
+    train_edge_type = ('Playlist', 'Has Track', 'Track')
+    p_idx_train, t_idx_train = train_data[train_edge_type].edge_label_index
+    labels_train = train_data[train_edge_type].edge_label
+
+    train_tracks_by_playlist = defaultdict(set)
+    for pid, tid, lbl in zip(p_idx_train.tolist(), t_idx_train.tolist(), labels_train.tolist()):
+        if lbl == 1:
+            train_tracks_by_playlist[pid].add(tid)
+
     with torch.no_grad():
-        # Playlist embeddings (all playlists)
-        graph_input = {"nodes": {ntype: data[ntype].x.to(device) for ntype in data.node_types},
-                "edges": {etype: data[etype].edge_index.to(device) for etype in data.edge_types}}
 
-        track_ids = torch.tensor(list(data["Track"].ids), dtype=torch.long)
+        out = model(train_data.x_dict, train_data.edge_index_dict)
 
-        out = model(graph_input["nodes"], graph_input["edges"])
         playlist_emb = out['Playlist']
 
         # Track embeddings (only those in training set)
         track_emb = out["Track"]
-
-        track_emb = F.normalize(track_emb, dim=1)
+        track_ids = torch.arange(track_emb.size(0), device=device)
 
         test_edge_type = ('Playlist', 'Has Track', 'Track')
         p_idx, t_idx = test_data[test_edge_type].edge_label_index
@@ -393,16 +481,22 @@ if __name__ == "__main__":
 
         for pid, gt_tids in gt_tracks_by_playlist.items():
             p_vec = playlist_emb[pid].unsqueeze(0)  # [1, embed_dim]
-            p_vec = F.normalize(p_vec, dim=1)
 
             # similarity with training tracks
             sims = torch.matmul(p_vec, track_emb.t()).squeeze(0)  # [num_train_tracks]
 
-            # top-K recommended track indices (relative to train tracks)
-            topk_vals, topk_index = torch.topk(sims, K)
-            topk_index = topk_index.tolist()
+            ignore_tids = train_tracks_by_playlist.get(pid, set())
+            if ignore_tids:
+                mask = torch.ones_like(sims, dtype=torch.bool)
+                ignore_indices = torch.tensor(list(ignore_tids), device=sims.device)
+                mask[ignore_indices] = 0
+                sims_masked = sims.clone()
+                sims_masked[~mask] = -float('inf')  # ensure ignored tracks don't appear in topk
+            else:
+                sims_masked = sims
 
-            # Map topk indices back to global track IDs if needed
+            # top-K recommended track indices (relative to train tracks)
+            topk_vals, topk_index = torch.topk(sims_masked, K)
             topk_track_ids = track_ids[topk_index].tolist()
 
             # Hit Rate@K: at least one ground-truth track in top-K
@@ -415,5 +509,5 @@ if __name__ == "__main__":
         hit_rate = hit_count / num_playlists
         recall_at_k = recall_sum / num_playlists
 
-        print(f"Hit Rate@{K} (restricted to training tracks): {hit_rate:.4f}")
-        print(f"Recall@{K} (restricted to training tracks): {recall_at_k:.4f}")
+        print(f"Hit Rate@{K}: {hit_rate:.4f}")
+        print(f"Recall@{K}: {recall_at_k:.4f}")

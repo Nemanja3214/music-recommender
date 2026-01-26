@@ -22,7 +22,7 @@ class SpotifyHeteroGraphBuilder:
         "MusicPlaylist": "Playlist",
         "MusicGroup": "Artist",
         # "MusicAlbum": "Album",
-        "Genre": "Genre",
+        # "Genre": "Genre",
     }
 
     def __init__(self):
