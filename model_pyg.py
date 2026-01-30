@@ -1,4 +1,5 @@
 import os
+import random
 
 import torch
 import torch.nn as nn
@@ -66,6 +67,33 @@ def print_pyg_diagnostics(data: HeteroData):
               f"dst_dim={None if dst_x is None else dst_x.size(1)}")
     print("\n================ END DIAGNOSTICS ================\n")
 
+def sample_global_negatives_for_playlist(
+    pid: int,
+    num_tracks: int,
+    positives_set,
+    m: int,
+    device,
+):
+    # Sample m track ids uniformly from [0, num_tracks)
+    # excluding positives. (Allows repeats avoidance via while.)
+    negs = []
+    tries = 0
+    max_tries = max(1000, m * 50)
+
+    while len(negs) < m and tries < max_tries:
+        cand = random.randrange(num_tracks)
+        if cand not in positives_set:
+            negs.append(cand)
+        tries += 1
+
+    if len(negs) < m:
+        # fallback: just return what we got (better than crashing mid-train)
+        # but you can raise if you prefer
+        pass
+
+    return torch.tensor(negs, dtype=torch.long, device=device)
+
+
 def print_playlist_track_ranking(builder, train_tracks_by_playlist, playlist_emb, track_emb, K=20):
     from collections import defaultdict
     import torch
@@ -125,7 +153,7 @@ class HeteroGNN(nn.Module):
         # conv1: input -> hidden
         self.conv1 = HeteroConv(
             {
-                (src, rel, dst): SAGEConv(in_channels_dict[src], hidden_channels)
+                (src, rel, dst): SAGEConv(in_channels_dict[src], hidden_channels, normalize=True)
                 for (src, rel, dst) in self.edge_types
             },
             aggr='mean'
@@ -134,13 +162,11 @@ class HeteroGNN(nn.Module):
         # conv2: hidden -> out
         self.conv2 = HeteroConv(
             {
-                (src, rel, dst): SAGEConv(hidden_channels, out_channels)
+                (src, rel, dst): SAGEConv(hidden_channels, out_channels, normalize=True)
                 for (src, rel, dst) in self.edge_types
             },
             aggr='mean'
         )
-        self.norm1 = nn.ModuleDict({nt: nn.LayerNorm(hidden_channels) for nt in metadata[0]})
-        self.norm2 = nn.ModuleDict({nt: nn.LayerNorm(out_channels) for nt in metadata[0]})
 
         self.res_proj = nn.ModuleDict({
             ntype: nn.Linear(hidden_channels, out_channels) for ntype in node_types
@@ -155,21 +181,43 @@ class HeteroGNN(nn.Module):
         # ----- Conv1: input -> hidden -----
         x1 = self.conv1(x_dict, edge_index_dict)
         x1 = {
-            k: F.dropout(F.relu(self.norm1[k](v)), p=self.dropout, training=self.training)
+            k: F.dropout(F.relu(v), p=self.dropout, training=self.training)
             for k, v in x1.items()
         }
 
         # ----- Conv2: hidden -> out with residual -----
         x2 = self.conv2(x1, edge_index_dict)
         x2 = {
-            k: self.norm2[k](v + self.res_proj[k](x1[k]))
+            k: v + self.res_proj[k](x1[k])
             for k, v in x2.items()
         }
 
-        # ----- Optional final linear projection -----
-        out = {k: self.post_lin[k](v) for k, v in x2.items()}
+        return x2
 
-        return out
+        # ----- Optional final linear projection -----
+        # out = {k: self.post_lin[k](v) for k, v in x2.items()}
+        #
+        # return out
+
+
+def check_train_test_overlap(train_data, test_data, edge_type=('Playlist', 'Has Track', 'Track')):
+    # Train positives
+    train_mask = train_data[edge_type].edge_label == 1
+    train_edges = set(tuple(x.tolist()) for x in train_data[edge_type].edge_label_index[:, train_mask].t())
+
+    # Test positives
+    test_mask = test_data[edge_type].edge_label == 1
+    test_edges = set(tuple(x.tolist()) for x in test_data[edge_type].edge_label_index[:, test_mask].t())
+
+    # Include reversed edges
+    rev_train_edges = set((dst, src) for src, dst in train_edges)
+    rev_test_edges = set((dst, src) for src, dst in test_edges)
+
+    all_train_edges = train_edges.union(rev_train_edges)
+    all_test_edges = test_edges.union(rev_test_edges)
+
+    overlap = all_train_edges.intersection(all_test_edges)
+    print("Number of overlapping POSITIVE edges (including reversed):", len(overlap))
 
 # -------------------------
 # Main usage
@@ -183,27 +231,30 @@ if __name__ == "__main__":
 
     # print_pyg_diagnostics(data)
 
-    transform = T.Compose([T.ToUndirected()])
-    data = transform(data)
+    transform = T.Compose([T.NormalizeFeatures(),
+                           T.ToUndirected(),
+                           T.RandomLinkSplit(
+                                num_val=0.1,
+                                num_test=0.2,
+                                is_undirected=True,
+                                add_negative_train_samples=False,
+                                disjoint_train_ratio=0.0,
+                                neg_sampling_ratio=5,
+                                edge_types=[pt],
+                                rev_edge_types=[rev_pt]
+                            )
+                           ])
+    train_data, val_data, test_data = transform(data)
     print_pyg_diagnostics(data)
 
-    split = T.RandomLinkSplit(
-        num_val=0.0,
-        num_test=0.1,
-        is_undirected=True,
-        key="edge_label",
-        add_negative_train_samples=True,
-        disjoint_train_ratio=0.0,
-        neg_sampling_ratio=20,
-        edge_types=[pt],
-        rev_edge_types=[rev_pt]
-    )
-    train_data, val_data, test_data = split(data)
+
     print("TRAIN")
     print(train_data)
 
+
     print("TEST")
     print(test_data)
+
     # Build model from final metadata
     in_dims = {ntype: train_data[ntype].x.size(1) for ntype in data.node_types}
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -214,7 +265,7 @@ if __name__ == "__main__":
                       dropout=0.2)
 
     model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-5)
 
 
     # Move all data to device
@@ -228,9 +279,9 @@ if __name__ == "__main__":
     # Node counts for negative sampling
     node_counts = {ntype: train_data[ntype].num_nodes for ntype in train_data.node_types}
 
-    batch_size = 256
-    epochs = 15
-    num_neighbors = [50, 25]
+    batch_size = 1024
+    epochs = 10
+    num_neighbors = [15, 10]
     seed_node_type = None
     target_edge = "Playlist" ,"Has Track", "Track"
 
@@ -243,27 +294,6 @@ if __name__ == "__main__":
 
     test_edge_label_index = test_data[target_edge].edge_label_index
     test_edge_label = test_data[target_edge].edge_label
-
-
-    def check_train_test_overlap(train_data, test_data, edge_type=('Playlist', 'Has Track', 'Track')):
-        # Train positives
-        train_mask = train_data[edge_type].edge_label == 1
-        train_edges = set(tuple(x.tolist()) for x in train_data[edge_type].edge_label_index[:, train_mask].t())
-
-        # Test positives
-        test_mask = test_data[edge_type].edge_label == 1
-        test_edges = set(tuple(x.tolist()) for x in test_data[edge_type].edge_label_index[:, test_mask].t())
-
-        # Include reversed edges
-        rev_train_edges = set((dst, src) for src, dst in train_edges)
-        rev_test_edges = set((dst, src) for src, dst in test_edges)
-
-        all_train_edges = train_edges.union(rev_train_edges)
-        all_test_edges = test_edges.union(rev_test_edges)
-
-        overlap = all_train_edges.intersection(all_test_edges)
-        print("Number of overlapping POSITIVE edges (including reversed):", len(overlap))
-
 
     check_train_test_overlap(train_data, test_data)
 
@@ -291,9 +321,16 @@ if __name__ == "__main__":
         edge_label=test_edge_label,
         num_neighbors=num_neighbors,
     )
-    criterion = nn.TripletMarginLoss(margin=1.0)
 
     epoch_losses = []
+
+    p_idx_train, t_idx_train = train_data[pt].edge_label_index
+    labels_train = train_data[pt].edge_label
+
+    train_tracks_by_playlist = defaultdict(set)
+    for pid, tid, lbl in zip(p_idx_train.tolist(), t_idx_train.tolist(), labels_train.tolist()):
+        if lbl == 1:
+            train_tracks_by_playlist[pid].add(tid)
 
     for epoch in range(1, epochs + 1):
         model.train()
@@ -303,6 +340,17 @@ if __name__ == "__main__":
 
         batch_count = 0
         skipped_count = 0
+
+        used_batches = 0
+        pairs_used = 0
+
+        pos_mean_sum = 0.0
+        neg_mean_sum = 0.0
+        margin_mean_sum = 0.0
+
+        # optional: for crude AUC on sampled pairs
+        auc_correct = 0
+        auc_total = 0
 
         for batch in trainloader:
             # diagnose_batch(model, batch, target_edge, device)
@@ -323,6 +371,9 @@ if __name__ == "__main__":
             # get corresponding playlists and tracks embeddings
             z_p = out['Playlist'][p_idx]
             z_t = out['Track'][t_idx]
+            z_p = F.normalize(z_p, dim=1)
+            z_t = F.normalize(z_t, dim=1)
+
             scores = (z_p * z_t).sum(dim=1)
 
             pos_by_playlist = defaultdict(list)
@@ -342,17 +393,18 @@ if __name__ == "__main__":
             neg_scores = []
 
             for pid in pos_by_playlist:
-                # add only scores that have negative
                 if pid not in neg_by_playlist:
                     continue
 
+                # stack negatives for this playlist
+                negs = torch.stack(neg_by_playlist[pid])  # shape: [num_neg]
+
+                # take hardest negative (highest score)
+                hardest_neg = negs.max()
+
                 for ps in pos_by_playlist[pid]:
-                    # add random negative link for that playlist
-                    ns = neg_by_playlist[pid][
-                        torch.randint(0, len(neg_by_playlist[pid]), (1,))
-                    ]
                     pos_scores.append(ps)
-                    neg_scores.append(ns)
+                    neg_scores.append(hardest_neg)
 
 
             if len(pos_scores) == 0:
@@ -363,16 +415,51 @@ if __name__ == "__main__":
             pos_scores = torch.stack(pos_scores)
             neg_scores = torch.stack(neg_scores)
 
-            # BPR loss
-            loss = F.softplus(-(pos_scores - neg_scores)).mean()
+            used_batches += 1
+            pairs_used += pos_scores.numel()
+
+            pos_m = pos_scores.mean().item()
+            neg_m = neg_scores.mean().item()
+            margin_m = (pos_scores - neg_scores).mean().item()
+
+            pos_mean_sum += pos_m
+            neg_mean_sum += neg_m
+            margin_mean_sum += margin_m
+
+            # optional AUC over sampled pairs: fraction where pos > neg
+            auc_correct += (pos_scores > neg_scores).sum().item()
+            auc_total += pos_scores.numel()
+
+            loss = F.softplus(-(pos_scores - neg_scores)).mean()  # stable BPR)
 
             loss.backward()
             optimizer.step()
             # print(f"Batch loss {float(loss)}")
             total_loss_epoch += float(loss)
 
-        print(f"Epoch {epoch:03d} | Loss: {total_loss_epoch:.4f}"
-              f"Skipped {skipped_count}/{batch_count}")
+        avg_loss_used = total_loss_epoch / max(1, used_batches)
+        avg_pos = pos_mean_sum / max(1, used_batches)
+        avg_neg = neg_mean_sum / max(1, used_batches)
+        avg_margin = margin_mean_sum / max(1, used_batches)
+        auc = auc_correct / max(1, auc_total)
+
+        print(
+            f"Epoch {epoch:03d} | "
+            f"Loss(sum): {total_loss_epoch:.4f} | Loss/used_batch: {avg_loss_used:.4f} | "
+            f"pairs: {pairs_used} | "
+            f"pos_mean: {avg_pos:.4f} | neg_mean: {avg_neg:.4f} | margin: {avg_margin:.4f} | "
+            f"AUC~: {auc:.4f} | "
+            f"Skipped {skipped_count}/{batch_count}"
+        )
+
+        model.eval()
+        with torch.no_grad():
+            out = model(train_data.x_dict, train_data.edge_index_dict)
+            print("Epoch", epoch,
+                  "| Std Track:", out['Track'].std(dim=0).mean().item(),
+                  "| Std Playlist:", out['Playlist'].std(dim=0).mean().item())
+
+        model.train()
         epoch_losses.append(total_loss_epoch)
 
     plt.plot(epoch_losses)
@@ -399,10 +486,9 @@ if __name__ == "__main__":
 
         out = model(train_data.x_dict, train_data.edge_index_dict)
 
-        playlist_emb = out['Playlist']
+        playlist_emb = F.normalize(out['Playlist'], dim=1)
+        track_emb = F.normalize(out['Track'], dim=1)
 
-        # Track embeddings (only those in training set)
-        track_emb = out["Track"]
         track_ids = torch.arange(track_emb.size(0), device=device)
 
         test_edge_type = ('Playlist', 'Has Track', 'Track')
@@ -419,7 +505,7 @@ if __name__ == "__main__":
         for pid, tid in zip(p_idx_pos.tolist(), t_idx_pos.tolist()):
             gt_tracks_by_playlist[pid].append(tid)
 
-        K = 20
+        K = 100
         hit_count = 0
         recall_sum = 0
         num_playlists = len(gt_tracks_by_playlist)

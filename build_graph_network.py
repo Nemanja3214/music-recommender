@@ -100,7 +100,7 @@ class SpotifyHeteroGraphBuilder:
 
     def build_heterograph(self):
         data = HeteroData()
-        max_feature_list_len = 512
+        max_feature_list_len = 256
 
         # -------------------------
         # 1. Add edges (PyG style)
