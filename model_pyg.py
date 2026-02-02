@@ -233,6 +233,18 @@ def check_train_test_overlap(train_data, test_data, edge_type=('Playlist', 'Has 
     if len(overlap) > 0:
         exit()
 
+def get_degree_by_node_type(data, node_type):
+    deg = torch.zeros(data[node_type].num_nodes, dtype=torch.long)
+
+    for (src, rel, dst) in data.edge_types:
+        ei = data[(src, rel, dst)].edge_index
+        if src == node_type:
+            deg.scatter_add_(0, ei[0], torch.ones(ei.size(1), dtype=torch.long))
+        if dst == node_type:
+            deg.scatter_add_(0, ei[1], torch.ones(ei.size(1), dtype=torch.long))
+
+    return deg.cpu().numpy()
+
 # -------------------------
 # Main usage
 # -------------------------
@@ -240,6 +252,59 @@ if __name__ == "__main__":
     builder = SpotifyHeteroGraphBuilder()
     data, nodes_id_map = builder.run()
 
+    playlist_deg = get_degree_by_node_type(data, "Playlist")
+    track_deg = get_degree_by_node_type(data, "Track")
+    artist_deg = get_degree_by_node_type(data, "Artist")
+
+    plt.figure(figsize=(8, 5))
+    plt.boxplot(
+        [playlist_deg, track_deg, artist_deg],
+        labels=["Playlist", "Track", "Artist"],
+        showfliers=True
+    )
+    plt.ylabel("Node Degree")
+    plt.title("Node Degree Distribution (Train Graph)")
+    plt.grid(True)
+    plt.show()
+
+    plt.figure(figsize=(14, 4))
+
+    for i, (deg, name) in enumerate([
+        (playlist_deg, "Playlist"),
+        (track_deg, "Track"),
+        (artist_deg, "Artist")
+    ]):
+        plt.subplot(1, 3, i + 1)
+        plt.hist(deg, bins=50, log=True)
+        plt.title(name)
+        plt.xlabel("Degree")
+        plt.ylabel("Count (log)")
+
+    plt.tight_layout()
+    plt.show()
+
+    import numpy as np
+    def print_stats(name, deg):
+        print(f"\n{name}")
+        print(f"  nodes: {len(deg)}")
+        print(f"  min:   {deg.min()}")
+        print(f"  mean:  {deg.mean():.2f}")
+        print(f"  median:{np.median(deg):.2f}")
+        print(f"  max:   {deg.max()}")
+        print(f"  p95:   {np.percentile(deg, 95):.1f}")
+        print(f"  p99:   {np.percentile(deg, 99):.1f}")
+
+
+    print_stats("Playlist", playlist_deg)
+    print_stats("Track", track_deg)
+    print_stats("Artist", artist_deg)
+
+    p, t = data[("Playlist", "Has Track", "Track")].edge_index
+    plt.scatter(playlist_deg[p], track_deg[t], alpha=0.2)
+    plt.xlabel("Playlist Degree")
+    plt.ylabel("Track Degree")
+    plt.title("Playlist–Track Degree Correlation")
+    plt.show()
 
     edge_type = ("Playlist", "Has Track", "Track")
     rev_edge_type = ("Track", "rev_Has Track", "Playlist")
