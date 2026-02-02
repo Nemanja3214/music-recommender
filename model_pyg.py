@@ -289,7 +289,7 @@ if __name__ == "__main__":
     # Node counts for negative sampling
     node_counts = {ntype: train_data[ntype].num_nodes for ntype in train_data.node_types}
 
-    epochs = 100
+    epochs = 20
     seed_node_type = None
     check_train_test_overlap(train_data, test_data)
 
@@ -465,7 +465,7 @@ if __name__ == "__main__":
             f"Epoch {epoch:03d} | "
             f"train_loss: {loss.item():.4f} | "
             f"train_margin: {train_margin:.4f} | "
-            f"train_AUC~: {train_auc_approx:.4f} | "
+            # f"train_AUC~: {train_auc_approx:.4f} | "
             f"VAL gAUC: {gauc:.4f} | "
             f"VAL MRR: {mrr:.4f} | "
             f"VAL NDCG@{K}: {ndcg:.4f} | "

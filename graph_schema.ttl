@@ -102,6 +102,7 @@
         <spotify:track:42zd6DYQ4o4SECmTITrM1U>,
         <spotify:track:4GVD0FIBo08FSAy3tbIY7g>,
         <spotify:track:4Hj5yNHgu2dyrnzRQN7Gld>,
+        <spotify:track:4NTWZqvfQTlOMitlVn6tew>,
         <spotify:track:4c1BAfuPGZSun6aAvmmoHs>,
         <spotify:track:4dAUGcD3zfZhJPyLXFSAUW>,
         <spotify:track:4scpF6J5uMBvoh6sFB7EL1>,
@@ -2047,6 +2048,7 @@
         <spotify:track:2d8JP84HNLKhmd6IYOoupQ>,
         <spotify:track:38x3I8MkpDFgXft9QUQQOI>,
         <spotify:track:3Ti0GdlrotgwsAVBBugv0I>,
+        <spotify:track:4NTWZqvfQTlOMitlVn6tew>,
         <spotify:track:50Fp9rUhDZvGJ4UUz4mTwp>,
         <spotify:track:5M708qYwdT7xyQqO0WXnzm>,
         <spotify:track:5Om5t5bVP7AoXs3iHo1ZNU>,
@@ -2062,6 +2064,7 @@
     ns1:num_tracks 24 ;
     schema1:Name "GUACAMOLE" ;
     schema1:Track <spotify:track:15xNv1IPTf8fnIXkguH74p>,
+        <spotify:track:1KtVVUM6OkpyOsbVfbMybX>,
         <spotify:track:1usLCyaUZ2y0uoPmKj1uYo>,
         <spotify:track:3Dp5SHGbRIqjGGI3cPdESA>,
         <spotify:track:4InLm5a9Qtkru6YxEjM4Qc>,
@@ -2737,6 +2740,7 @@
         <spotify:track:3WL6yCfh0zw2MxVSWSe0G1>,
         <spotify:track:448jAEFZ22wbfkZj2F4Gnq>,
         <spotify:track:4KW1lqgSr8TKrvBII0Brf8>,
+        <spotify:track:4NTWZqvfQTlOMitlVn6tew>,
         <spotify:track:4P7VFiaZb3xrXoqGwZXC3J>,
         <spotify:track:4cg1yakyRSIOjxKM2I7J1q>,
         <spotify:track:4uhvMW7ly7tJil31YYscAN>,
@@ -15233,11 +15237,6 @@
     schema1:byArtist <spotify:artist:12H1Dmi64fAmmARrsyVFzy>,
         <spotify:artist:3uHnfXxUrnPq1XYw8t8Sz2> .
 
-<spotify:album:7BEPVoBcHuTLWpcdj8FhM8> a schema1:MusicAlbum ;
-    schema1:Name "I Cry When I Laugh" ;
-    schema1:byArtist <spotify:artist:4ScCswdRlyA23odg9thgIO>,
-        <spotify:artist:6MDME20pz9RveH9rEXvrOM> .
-
 <spotify:album:7BL3IrC2KXQ3bWm0iM2pMR> a schema1:MusicAlbum ;
     schema1:Name "Forgiveness Rock Record" ;
     schema1:byArtist <spotify:artist:7lOJ7WXyopaxri0dbOiZkd> .
@@ -18119,12 +18118,6 @@
 <spotify:album:1iR4nCpn5EUKLAdVk9MLeg> a schema1:MusicAlbum ;
     schema1:Name "The Pretty & the Plain" ;
     schema1:byArtist <spotify:artist:7dq8KEwf0kQXJhM79iwcPh> .
-
-<spotify:album:1j0apvEvaWbTmlZpKsfr2D> a schema1:MusicAlbum ;
-    schema1:Name "Lasers" ;
-    schema1:byArtist <spotify:artist:01QTIT5P1pFP3QnnFSdsJf>,
-        <spotify:artist:4utLUGcTvOJFr6aqIJtYWV>,
-        <spotify:artist:5y2Xq6xcjJb2jVM54GHK3t> .
 
 <spotify:album:1j2rtIlRBcUHmxtn4Z4vGc> a schema1:MusicAlbum ;
     schema1:Name "Witching Hour" ;
@@ -24518,6 +24511,11 @@
     schema1:Name "Solidstar" ;
     schema1:byArtist <spotify:artist:1Nuq9WJb01OoR56vu02bhX>,
         <spotify:artist:7gEgjd9W1P1iAD9FbubrqC> .
+
+<spotify:album:7BEPVoBcHuTLWpcdj8FhM8> a schema1:MusicAlbum ;
+    schema1:Name "I Cry When I Laugh" ;
+    schema1:byArtist <spotify:artist:4ScCswdRlyA23odg9thgIO>,
+        <spotify:artist:6MDME20pz9RveH9rEXvrOM> .
 
 <spotify:album:7BYmCd8JAOHpIiHIDJwDW0> a schema1:MusicAlbum ;
     schema1:Name "Buy Me A Boat" ;
@@ -40916,6 +40914,22 @@
     schema1:Name "Gilded Oldies" ;
     schema1:byArtist <spotify:artist:5rFQl8QehNSMIJVnyhTmzY> ;
     schema1:inAlbum <spotify:album:3HIKauiNrjEDpNPSiBhzae> .
+
+<spotify:track:1KtVVUM6OkpyOsbVfbMybX> a schema1:MusicRecording ;
+    ns1:acousticness 6.08e-02 ;
+    ns1:danceability 5.71e-01 ;
+    ns1:duration 211460 ;
+    ns1:energy 8.15e-01 ;
+    ns1:instrumentalness 0e+00 ;
+    ns1:liveness 1.63e-01 ;
+    ns1:loudness -3.267e+00 ;
+    ns1:pos 1 ;
+    ns1:speechiness 3.21e-02 ;
+    ns1:tempo 1.20008e+02 ;
+    ns1:valence 6.64e-01 ;
+    schema1:Name "Don't Be So Hard On Yourself" ;
+    schema1:byArtist <spotify:artist:4ScCswdRlyA23odg9thgIO> ;
+    schema1:inAlbum <spotify:album:7BEPVoBcHuTLWpcdj8FhM8> .
 
 <spotify:track:1Kzxd1kkjaGX4JZz2CYsXB> a schema1:MusicRecording ;
     ns1:acousticness 9.88e-01 ;
@@ -86881,6 +86895,12 @@
     schema1:Name "Daydream" ;
     schema1:byArtist <spotify:artist:4iHNK0tOyZPYnBU7nGAgpQ> .
 
+<spotify:album:1j0apvEvaWbTmlZpKsfr2D> a schema1:MusicAlbum ;
+    schema1:Name "Lasers" ;
+    schema1:byArtist <spotify:artist:01QTIT5P1pFP3QnnFSdsJf>,
+        <spotify:artist:4utLUGcTvOJFr6aqIJtYWV>,
+        <spotify:artist:5y2Xq6xcjJb2jVM54GHK3t> .
+
 <spotify:album:1jcYwZsN7JEve9xsq9BuUX> a schema1:MusicAlbum ;
     schema1:Name "Number Ones" ;
     schema1:byArtist <spotify:artist:3fMbdgg4jU18AjLCKBhRSm> .
@@ -106554,6 +106574,24 @@
         <spotify:artist:6VuMaDnrHyPL1p4EHjYLi7> ;
     schema1:inAlbum <spotify:album:5J4SS8wTmXdyIEVYjmHzpZ> .
 
+<spotify:track:4NTWZqvfQTlOMitlVn6tew> a schema1:MusicRecording ;
+    ns1:acousticness 1.89e-02 ;
+    ns1:danceability 5.91e-01 ;
+    ns1:duration 239613 ;
+    ns1:energy 8.89e-01 ;
+    ns1:instrumentalness 0e+00 ;
+    ns1:liveness 1.55e-01 ;
+    ns1:loudness -3.839e+00 ;
+    ns1:pos 3,
+        4,
+        20 ;
+    ns1:speechiness 1.15e-01 ;
+    ns1:tempo 1.43067e+02 ;
+    ns1:valence 6.5e-01 ;
+    schema1:Name "The Show Goes On" ;
+    schema1:byArtist <spotify:artist:01QTIT5P1pFP3QnnFSdsJf> ;
+    schema1:inAlbum <spotify:album:1j0apvEvaWbTmlZpKsfr2D> .
+
 <spotify:track:4P6BuLsqtg5uISdE77ypI9> a schema1:MusicRecording ;
     ns1:acousticness 9.6e-02 ;
     ns1:danceability 9.05e-01 ;
@@ -113166,13 +113204,6 @@
         <spotify:artist:51Blml2LZPmy7TTiAg47vQ>,
         <spotify:artist:5pKCCKE2ajJHZ9KAiaK11H> .
 
-<spotify:artist:01QTIT5P1pFP3QnnFSdsJf> a schema1:MusicGroup ;
-    ns1:num_followers 1990394,
-        1990706,
-        1994682 ;
-    ns1:popularity 69 ;
-    schema1:Name "Lupe Fiasco" .
-
 <spotify:artist:03r4iKL2g2442PT9n2UKsx> a schema1:MusicGroup ;
     ns1:num_followers 3178722,
         3183156 ;
@@ -113371,13 +113402,6 @@
     ns1:popularity 81 ;
     schema1:Name "James Arthur" ;
     schema1:genre <soft_pop> .
-
-<spotify:artist:4ScCswdRlyA23odg9thgIO> a schema1:MusicGroup ;
-    ns1:num_followers 3170643,
-        3173477,
-        3175042 ;
-    ns1:popularity 74 ;
-    schema1:Name "Jess Glynne" .
 
 <spotify:artist:4Xt0mNxZEZWjgJwsZKDuvQ> a schema1:MusicGroup ;
     ns1:num_followers 189926 ;
@@ -113630,6 +113654,13 @@
     schema1:Name "The Life Of Pablo" ;
     schema1:byArtist <spotify:artist:5K4W6rqBFWDnAN6FQUkS6x> .
 
+<spotify:artist:01QTIT5P1pFP3QnnFSdsJf> a schema1:MusicGroup ;
+    ns1:num_followers 1990394,
+        1990706,
+        1994682 ;
+    ns1:popularity 69 ;
+    schema1:Name "Lupe Fiasco" .
+
 <spotify:artist:05fG473iIaoy82BF1aGhL8> a schema1:MusicGroup ;
     ns1:num_followers 14227101,
         14294483 ;
@@ -113741,6 +113772,13 @@
     ns1:popularity 51 ;
     schema1:Name "Kelly Price" ;
     schema1:genre <r&b> .
+
+<spotify:artist:4ScCswdRlyA23odg9thgIO> a schema1:MusicGroup ;
+    ns1:num_followers 3170643,
+        3173477,
+        3175042 ;
+    ns1:popularity 74 ;
+    schema1:Name "Jess Glynne" .
 
 <spotify:artist:4iHNK0tOyZPYnBU7nGAgpQ> a schema1:MusicGroup ;
     ns1:num_followers 12053046,
