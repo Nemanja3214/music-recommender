@@ -1,6 +1,6 @@
 import os
 import random
-
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -12,6 +12,28 @@ from torch_geometric.data import HeteroData
 from build_graph_network import SpotifyHeteroGraphBuilder
 from collections import defaultdict
 import matplotlib.pyplot as plt
+
+
+def sample_bpr_negatives_train_only(p_pos, num_tracks, train_pos_set, num_neg=10):
+    """
+    Train-only negative sampling:
+    For each playlist p_pos[i], sample num_neg tracks that are NOT connected to p in TRAIN.
+    Returns t_neg: [E, num_neg]
+    """
+    device = p_pos.device
+    E = p_pos.size(0)
+
+    t_neg = torch.randint(0, num_tracks, (E, num_neg), device=device)
+
+    for i in range(E):
+        p = int(p_pos[i].item())
+        for j in range(num_neg):
+            tn = int(t_neg[i, j].item())
+            while (p, tn) in train_pos_set:
+                tn = random.randrange(num_tracks)
+            t_neg[i, j] = tn
+
+    return t_neg
 
 # -------------------------
 # Diagnostics / utils
@@ -67,33 +89,6 @@ def print_pyg_diagnostics(data: HeteroData):
               f"dst_dim={None if dst_x is None else dst_x.size(1)}")
     print("\n================ END DIAGNOSTICS ================\n")
 
-def sample_global_negatives_for_playlist(
-    pid: int,
-    num_tracks: int,
-    positives_set,
-    m: int,
-    device,
-):
-    # Sample m track ids uniformly from [0, num_tracks)
-    # excluding positives. (Allows repeats avoidance via while.)
-    negs = []
-    tries = 0
-    max_tries = max(1000, m * 50)
-
-    while len(negs) < m and tries < max_tries:
-        cand = random.randrange(num_tracks)
-        if cand not in positives_set:
-            negs.append(cand)
-        tries += 1
-
-    if len(negs) < m:
-        # fallback: just return what we got (better than crashing mid-train)
-        # but you can raise if you prefer
-        pass
-
-    return torch.tensor(negs, dtype=torch.long, device=device)
-
-
 def print_playlist_track_ranking(builder, train_tracks_by_playlist, playlist_emb, track_emb, K=20):
     from collections import defaultdict
     import torch
@@ -140,7 +135,7 @@ def print_playlist_track_ranking(builder, train_tracks_by_playlist, playlist_emb
 
 
 class HeteroGNN(nn.Module):
-    def __init__(self, metadata, in_channels_dict, hidden_channels=256, out_channels=128, dropout=0.2):
+    def __init__(self, metadata, in_channels_dict, hidden_channels=256, out_channels=128, dropout=0.2, num_nodes_dict=None):
         super().__init__()
         node_types, edge_types = metadata
         self.node_types = list(node_types)
@@ -149,11 +144,20 @@ class HeteroGNN(nn.Module):
         self.out_channels = out_channels
         self.dropout = dropout
 
+        # Learnable ID embeddings (big win for Playlist)
+        self.id_emb = nn.ModuleDict()
+        self.use_id_emb = {"Playlist", "Artist"}  # instead of adding all ntypes
+
+        if num_nodes_dict is not None:
+            for ntype in node_types:
+                self.id_emb[ntype] = nn.Embedding(num_nodes_dict[ntype], in_channels_dict[ntype])
+                # self.use_id_emb.add(ntype)
+
         # Build conv modules only for relations present in edge_types
         # conv1: input -> hidden
         self.conv1 = HeteroConv(
             {
-                (src, rel, dst): SAGEConv(in_channels_dict[src], hidden_channels, normalize=True)
+                (src, rel, dst): SAGEConv(in_channels_dict[src], hidden_channels, normalize=False)
                 for (src, rel, dst) in self.edge_types
             },
             aggr='mean'
@@ -162,7 +166,7 @@ class HeteroGNN(nn.Module):
         # conv2: hidden -> out
         self.conv2 = HeteroConv(
             {
-                (src, rel, dst): SAGEConv(hidden_channels, out_channels, normalize=True)
+                (src, rel, dst): SAGEConv(hidden_channels, out_channels, normalize=False)
                 for (src, rel, dst) in self.edge_types
             },
             aggr='mean'
@@ -178,6 +182,14 @@ class HeteroGNN(nn.Module):
         print(self)
 
     def forward(self, x_dict, edge_index_dict):
+
+        x_dict = dict(x_dict)
+        for ntype in x_dict:
+            if ntype in self.use_id_emb:
+                # assumes nodes are 0..N-1
+                ids = torch.arange(x_dict[ntype].size(0), device=x_dict[ntype].device)
+                x_dict[ntype] = x_dict[ntype] + self.id_emb[ntype](ids)
+
         # ----- Conv1: input -> hidden -----
         x1 = self.conv1(x_dict, edge_index_dict)
         x1 = {
@@ -218,6 +230,8 @@ def check_train_test_overlap(train_data, test_data, edge_type=('Playlist', 'Has 
 
     overlap = all_train_edges.intersection(all_test_edges)
     print("Number of overlapping POSITIVE edges (including reversed):", len(overlap))
+    if len(overlap) > 0:
+        exit()
 
 # -------------------------
 # Main usage
@@ -226,22 +240,23 @@ if __name__ == "__main__":
     builder = SpotifyHeteroGraphBuilder()
     data, nodes_id_map = builder.run()
 
-    pt = ("Playlist", "Has Track", "Track")
-    rev_pt = ("Track", "rev_Has Track", "Playlist")
+
+    edge_type = ("Playlist", "Has Track", "Track")
+    rev_edge_type = ("Track", "rev_Has Track", "Playlist")
 
     # print_pyg_diagnostics(data)
 
     transform = T.Compose([T.NormalizeFeatures(),
                            T.ToUndirected(),
                            T.RandomLinkSplit(
-                                num_val=0.1,
+                                num_val=0.2,
                                 num_test=0.2,
                                 is_undirected=True,
                                 add_negative_train_samples=False,
-                                disjoint_train_ratio=0.0,
-                                neg_sampling_ratio=5,
-                                edge_types=[pt],
-                                rev_edge_types=[rev_pt]
+                                # disjoint_train_ratio=0.0,
+                                # neg_sampling_ratio=5,
+                                edge_types=[edge_type],
+                                rev_edge_types=[rev_edge_type]
                             )
                            ])
     train_data, val_data, test_data = transform(data)
@@ -258,210 +273,209 @@ if __name__ == "__main__":
     # Build model from final metadata
     in_dims = {ntype: train_data[ntype].x.size(1) for ntype in data.node_types}
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    num_nodes_dict = {ntype: train_data[ntype].num_nodes for ntype in train_data.node_types}
     model = HeteroGNN(metadata=train_data.metadata(),
                       in_channels_dict=in_dims,
                       hidden_channels=256,
                       out_channels=128,
-                      dropout=0.2)
+                      dropout=0.2,
+                      num_nodes_dict=num_nodes_dict
+                      )
 
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-5)
 
 
-    # Move all data to device
-    for ntype in train_data.node_types:
-        if train_data[ntype].x is not None:
-            train_data[ntype].x = train_data[ntype].x.to(device)
-    for etype in train_data.edge_types:
-        if train_data[etype].edge_index is not None:
-            train_data[etype].edge_index = train_data[etype].edge_index.to(device)
-
     # Node counts for negative sampling
     node_counts = {ntype: train_data[ntype].num_nodes for ntype in train_data.node_types}
 
-    batch_size = 1024
-    epochs = 10
-    num_neighbors = [15, 10]
+    epochs = 100
     seed_node_type = None
-    target_edge = "Playlist" ,"Has Track", "Track"
-
-    train_edge_label_index = train_data[target_edge].edge_label_index
-    train_edge_label = train_data[target_edge].edge_label
-    print(f"LABELS {train_edge_label}")
-
-    # val_edge_label_index = val_data[target_edge].edge_label_index
-    # val_edge_label = val_data[target_edge].edge_label
-
-    test_edge_label_index = test_data[target_edge].edge_label_index
-    test_edge_label = test_data[target_edge].edge_label
-
     check_train_test_overlap(train_data, test_data)
 
-    trainloader = LinkNeighborLoader(
-        train_data,
-        batch_size=batch_size,
-        shuffle=True,
-        edge_label_index=(target_edge, train_edge_label_index),
-        edge_label=train_edge_label,
-        num_neighbors=num_neighbors,
-    )
-    # valloader = LinkNeighborLoader(
-    #     val_data,
-    #     batch_size=batch_size,
-    #     shuffle=False,
-    #     edge_label_index=(target_edge, val_edge_label_index),
-    #     edge_label=val_edge_label,
-    #     num_neighbors=num_neighbors,
-    # )
-    testloader = LinkNeighborLoader(
-        test_data,
-        batch_size=1,
-        shuffle=False,
-        edge_label_index=(target_edge, test_edge_label_index),
-        edge_label=test_edge_label,
-        num_neighbors=num_neighbors,
-    )
+    # --- VAL positives (use edge_label_index) ---
+    val_mask = val_data[edge_type].edge_label == 1
+    val_ei = val_data[edge_type].edge_label_index[:, val_mask]
+    p_val, t_val = val_ei[0], val_ei[1]
+    val_pos_edges = list(zip(p_val.tolist(), t_val.tolist()))
 
+    val_gt_tracks = defaultdict(list)
+    for p, t in val_pos_edges:
+        val_gt_tracks[p].append(t)
+
+    # --- TEST positives (use edge_label_index) ---
+    test_mask = test_data[edge_type].edge_label == 1
+    test_ei = test_data[edge_type].edge_label_index[:, test_mask]
+    p_test, t_test = test_ei[0], test_ei[1]
+    test_pos_edges = list(zip(p_test.tolist(), t_test.tolist()))
+
+    test_gt_tracks = defaultdict(list)
+    for p, t in test_pos_edges:
+        test_gt_tracks[p].append(t)
+
+    # tracks already seen in TRAIN graph
+    p_tr, t_tr = train_data[edge_type].edge_index
+    seen_tracks = defaultdict(set)
+    for p, t in zip(p_tr.tolist(), t_tr.tolist()):
+        seen_tracks[p].add(t)
+    # -------------------------
+    # FULL-GRAPH TRAINING (fixed)
+    # -------------------------
     epoch_losses = []
 
-    p_idx_train, t_idx_train = train_data[pt].edge_label_index
-    labels_train = train_data[pt].edge_label
+    # Move whole objects to device (simplest way)
+    train_data = train_data.to(device)
+    val_data = val_data.to(device)
+    test_data = test_data.to(device)
 
-    train_tracks_by_playlist = defaultdict(set)
-    for pid, tid, lbl in zip(p_idx_train.tolist(), t_idx_train.tolist(), labels_train.tolist()):
-        if lbl == 1:
-            train_tracks_by_playlist[pid].add(tid)
+    # Positives (TRAIN graph edges)
+    pos_edge_index = train_data[edge_type].edge_index  # [2, E_pos]
+    p_pos, t_pos = pos_edge_index[0], pos_edge_index[1]
 
+    num_tracks = train_data["Track"].num_nodes
+
+    # For "is this a real edge?" filtering:
+    # NOTE: p_pos/t_pos are on GPU, so .tolist() makes a CPU copy (fine).
+    train_pos_set = set(zip(p_pos.tolist(), t_pos.tolist()))
+    train_val_pos_set = set(val_pos_edges) | train_pos_set
+
+    K = 100
+    best_state = None
+    best_val_score = -1e9
+    best_epoch = -1
     for epoch in range(1, epochs + 1):
+
+
+        # -------- train step (full-graph) --------
         model.train()
-        total_loss_epoch = 0.0
-        total_pos_epoch = 0
-        total_neg_epoch = 0
+        optimizer.zero_grad()
 
-        batch_count = 0
-        skipped_count = 0
+        out = model(train_data.x_dict, train_data.edge_index_dict)
+        playlist_emb = F.normalize(out["Playlist"], dim=1)
+        track_emb = F.normalize(out["Track"], dim=1)
 
-        used_batches = 0
-        pairs_used = 0
+        t_neg = sample_bpr_negatives_train_only(p_pos, num_tracks, train_pos_set, num_neg=50) #[E, num_neg]
 
-        pos_mean_sum = 0.0
-        neg_mean_sum = 0.0
-        margin_mean_sum = 0.0
+        # scores: [E] and [E,K]
+        pos_scores = (playlist_emb[p_pos] * track_emb[t_pos]).sum(dim=1)  # [E]
+        neg_scores = (playlist_emb[p_pos].unsqueeze(1) * track_emb[t_neg]).sum(2)  # [E,num_neg]
 
-        # optional: for crude AUC on sampled pairs
-        auc_correct = 0
-        auc_total = 0
+        logits = torch.cat([pos_scores.unsqueeze(1), neg_scores], dim=1)  # [E, num_neg+1]
+        labels = torch.zeros(logits.size(0), dtype=torch.long, device=logits.device)  # positive is index 0
 
-        for batch in trainloader:
-            # diagnose_batch(model, batch, target_edge, device)
-            # exit()
-            optimizer.zero_grad()
-            batch_count += 1
-            selected_batch = batch[target_edge]
+        loss = F.cross_entropy(logits, labels)
 
-            out = model(batch.x_dict, batch.edge_index_dict)
+        train_margin = (pos_scores.unsqueeze(1) - neg_scores).mean().item()
+        train_auc_approx = (pos_scores.unsqueeze(1) > neg_scores).float().mean().item()
 
-            edge_type = ('Playlist', 'Has Track', 'Track')
+        loss.backward()
+        optimizer.step()
 
-            # get ids
-            p_idx, t_idx = batch[edge_type].edge_label_index
-            # get 1s and 0s, same size as p_idx and t_idx
-            labels = batch[edge_type].edge_label
-
-            # get corresponding playlists and tracks embeddings
-            z_p = out['Playlist'][p_idx]
-            z_t = out['Track'][t_idx]
-            z_p = F.normalize(z_p, dim=1)
-            z_t = F.normalize(z_t, dim=1)
-
-            scores = (z_p * z_t).sum(dim=1)
-
-            pos_by_playlist = defaultdict(list)
-            neg_by_playlist = defaultdict(list)
-
-            # separate positives and negatives by pidx
-            for i in range(len(scores)):
-                # get playlist id from pidx
-                pid = p_idx[i].item()
-                if labels[i] == 1:
-                    pos_by_playlist[pid].append(scores[i])
-                else:
-                    neg_by_playlist[pid].append(scores[i])
+        epoch_losses.append(loss.item())
 
 
-            pos_scores = []
-            neg_scores = []
-
-            for pid in pos_by_playlist:
-                if pid not in neg_by_playlist:
-                    continue
-
-                # stack negatives for this playlist
-                negs = torch.stack(neg_by_playlist[pid])  # shape: [num_neg]
-
-                # take hardest negative (highest score)
-                hardest_neg = negs.max()
-
-                for ps in pos_by_playlist[pid]:
-                    pos_scores.append(ps)
-                    neg_scores.append(hardest_neg)
-
-
-            if len(pos_scores) == 0:
-                skipped_count += 1
-                continue
-
-
-            pos_scores = torch.stack(pos_scores)
-            neg_scores = torch.stack(neg_scores)
-
-            used_batches += 1
-            pairs_used += pos_scores.numel()
-
-            pos_m = pos_scores.mean().item()
-            neg_m = neg_scores.mean().item()
-            margin_m = (pos_scores - neg_scores).mean().item()
-
-            pos_mean_sum += pos_m
-            neg_mean_sum += neg_m
-            margin_mean_sum += margin_m
-
-            # optional AUC over sampled pairs: fraction where pos > neg
-            auc_correct += (pos_scores > neg_scores).sum().item()
-            auc_total += pos_scores.numel()
-
-            loss = F.softplus(-(pos_scores - neg_scores)).mean()  # stable BPR)
-
-            loss.backward()
-            optimizer.step()
-            # print(f"Batch loss {float(loss)}")
-            total_loss_epoch += float(loss)
-
-        avg_loss_used = total_loss_epoch / max(1, used_batches)
-        avg_pos = pos_mean_sum / max(1, used_batches)
-        avg_neg = neg_mean_sum / max(1, used_batches)
-        avg_margin = margin_mean_sum / max(1, used_batches)
-        auc = auc_correct / max(1, auc_total)
-
-        print(
-            f"Epoch {epoch:03d} | "
-            f"Loss(sum): {total_loss_epoch:.4f} | Loss/used_batch: {avg_loss_used:.4f} | "
-            f"pairs: {pairs_used} | "
-            f"pos_mean: {avg_pos:.4f} | neg_mean: {avg_neg:.4f} | margin: {avg_margin:.4f} | "
-            f"AUC~: {auc:.4f} | "
-            f"Skipped {skipped_count}/{batch_count}"
-        )
-
+        # -------- eval metrics --------
+        model.eval()
+        # -------- eval metrics (VALIDATION) --------
         model.eval()
         with torch.no_grad():
             out = model(train_data.x_dict, train_data.edge_index_dict)
-            print("Epoch", epoch,
-                  "| Std Track:", out['Track'].std(dim=0).mean().item(),
-                  "| Std Playlist:", out['Playlist'].std(dim=0).mean().item())
+            playlist_emb = F.normalize(out["Playlist"], dim=1)
+            track_emb = F.normalize(out["Track"], dim=1)
 
-        model.train()
-        epoch_losses.append(total_loss_epoch)
+            std_t = out["Track"].std(dim=0).mean().item()
+            std_p = out["Playlist"].std(dim=0).mean().item()
 
+            # ---- gAUC on VAL (pos vs random negatives) ----
+            correct = 0
+            total = 0
+            for p, t_posi in val_pos_edges:
+                pos = torch.dot(playlist_emb[p], track_emb[t_posi]).item()
+                neg_drawn = 0
+                while neg_drawn < 200:
+                    t_n = random.randrange(num_tracks)
+                    if (p, t_n) in train_val_pos_set:
+                        continue
+                    neg = torch.dot(playlist_emb[p], track_emb[t_n]).item()
+                    correct += (pos > neg)
+                    total += 1
+                    neg_drawn += 1
+            gauc = correct / max(1, total)
+
+            # ---- MRR / NDCG@K / Hits@K / Recall@K on VAL ----
+            mrr = 0.0
+            ndcg = 0.0
+            hits_k = 0
+            recall_k = 0.0
+            n = 0
+
+            for p, gt in val_gt_tracks.items():
+                sims = (playlist_emb[p:p + 1] @ track_emb.t()).squeeze(0)
+
+                # mask train-seen tracks
+                ignore = seen_tracks.get(p, set())
+                if ignore:
+                    sims = sims.clone()
+                    sims[list(ignore)] = -float("inf")
+
+                # top-K (for Hits/Recall)
+                topk_idx = torch.topk(sims, K).indices.tolist()
+                topk_set = set(topk_idx)
+                gt_set = set(gt)
+
+                hit_count = len(topk_set & gt_set)
+                if hit_count > 0:
+                    hits_k += 1
+                recall_k += hit_count / len(gt_set)
+
+                # ranks for MRR/NDCG
+                ranks = []
+                for t in gt:
+                    if torch.isneginf(sims[t]):
+                        continue
+                    rank = int((sims > sims[t]).sum().item()) + 1
+                    ranks.append(rank)
+
+                if not ranks:
+                    continue
+
+                best = min(ranks)
+                mrr += 1.0 / best
+
+                dcg = sum(1.0 / math.log2(r + 1) for r in ranks if r <= K)
+                idcg = sum(1.0 / math.log2(i + 2) for i in range(min(len(gt), K)))
+                ndcg += (dcg / idcg) if idcg > 0 else 0.0
+
+                n += 1
+
+            mrr /= max(1, n)
+            ndcg /= max(1, n)
+            hits_k /= max(1, n)
+            recall_k /= max(1, n)
+
+        # pick a selection metric (common: Recall@K or NDCG@K)
+        val_score = recall_k  # or: ndcg
+
+        if val_score > best_val_score:
+            best_val_score = val_score
+            best_epoch = epoch
+            best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+
+        print(
+            f"Epoch {epoch:03d} | "
+            f"train_loss: {loss.item():.4f} | "
+            f"train_margin: {train_margin:.4f} | "
+            f"train_AUC~: {train_auc_approx:.4f} | "
+            f"VAL gAUC: {gauc:.4f} | "
+            f"VAL MRR: {mrr:.4f} | "
+            f"VAL NDCG@{K}: {ndcg:.4f} | "
+            f"VAL Hits@{K}: {hits_k:.4f} | "
+            f"VAL Recall@{K}: {recall_k:.4f} | "
+            # f"StdT: {std_t:.4f} | StdP: {std_p:.4f} | "
+            f"best_epoch: {best_epoch:03d} (best_val={best_val_score:.4f})"
+        )
+
+    # Plot loss
     plt.plot(epoch_losses)
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
@@ -469,77 +483,88 @@ if __name__ == "__main__":
     plt.grid(True)
     plt.savefig("Loss.png")
 
-    print(f"STD track: {out['Track'].std(dim=0).mean()}")
-    print(f"STD playlist: {out['Playlist'].std(dim=0).mean()}")
+    # -------- FINAL TEST (once) --------
+    if best_state is not None:
+        model.load_state_dict(best_state)
+        model.to(device)
+
+    all_pos_set = set(train_pos_set)
+    all_pos_set.update(val_pos_edges)
+    all_pos_set.update(test_pos_edges)
 
     model.eval()
-    train_edge_type = ('Playlist', 'Has Track', 'Track')
-    p_idx_train, t_idx_train = train_data[train_edge_type].edge_label_index
-    labels_train = train_data[train_edge_type].edge_label
-
-    train_tracks_by_playlist = defaultdict(set)
-    for pid, tid, lbl in zip(p_idx_train.tolist(), t_idx_train.tolist(), labels_train.tolist()):
-        if lbl == 1:
-            train_tracks_by_playlist[pid].add(tid)
-
     with torch.no_grad():
-
         out = model(train_data.x_dict, train_data.edge_index_dict)
+        playlist_emb = F.normalize(out["Playlist"], dim=1)
+        track_emb = F.normalize(out["Track"], dim=1)
 
-        playlist_emb = F.normalize(out['Playlist'], dim=1)
-        track_emb = F.normalize(out['Track'], dim=1)
+        # gAUC on TEST
+        correct = 0
+        total = 0
+        for p, t_posi in test_pos_edges:
+            pos = torch.dot(playlist_emb[p], track_emb[t_posi]).item()
+            neg_drawn = 0
+            while neg_drawn < 200:
+                t_n = random.randrange(num_tracks)
+                if (p, t_n) in all_pos_set:
+                    continue
+                neg = torch.dot(playlist_emb[p], track_emb[t_n]).item()
+                correct += (pos > neg)
+                total += 1
+                neg_drawn += 1
+        test_gauc = correct / max(1, total)
 
-        track_ids = torch.arange(track_emb.size(0), device=device)
+        # MRR / NDCG / Hits / Recall on TEST
+        test_mrr = 0.0
+        test_ndcg = 0.0
+        test_hits = 0
+        test_recall = 0.0
+        n = 0
 
-        test_edge_type = ('Playlist', 'Has Track', 'Track')
-        p_idx, t_idx = test_data[test_edge_type].edge_label_index
-        labels = test_data[test_edge_type].edge_label
+        for p, gt in test_gt_tracks.items():
+            sims = (playlist_emb[p:p + 1] @ track_emb.t()).squeeze(0)
 
-        # Only keep positive edges (label == 1)
-        pos_mask = labels == 1
-        p_idx_pos = p_idx[pos_mask]
-        t_idx_pos = t_idx[pos_mask]
+            ignore = seen_tracks.get(p, set())
+            if ignore:
+                sims = sims.clone()
+                sims[list(ignore)] = -float("inf")
 
-        # Group ground-truth tracks by playlist
-        gt_tracks_by_playlist = defaultdict(list)
-        for pid, tid in zip(p_idx_pos.tolist(), t_idx_pos.tolist()):
-            gt_tracks_by_playlist[pid].append(tid)
+            topk_idx = torch.topk(sims, K).indices.tolist()
+            topk_set = set(topk_idx)
+            gt_set = set(gt)
 
-        K = 100
-        hit_count = 0
-        recall_sum = 0
-        num_playlists = len(gt_tracks_by_playlist)
+            hit_count = len(topk_set & gt_set)
+            if hit_count > 0:
+                test_hits += 1
+            test_recall += hit_count / len(gt_set)
 
-        for pid, gt_tids in gt_tracks_by_playlist.items():
-            p_vec = playlist_emb[pid].unsqueeze(0)  # [1, embed_dim]
+            ranks = []
+            for t in gt:
+                if torch.isneginf(sims[t]):
+                    continue
+                rank = int((sims > sims[t]).sum().item()) + 1
+                ranks.append(rank)
 
-            # similarity with training tracks
-            sims = torch.matmul(p_vec, track_emb.t()).squeeze(0)  # [num_train_tracks]
+            if not ranks:
+                continue
 
-            ignore_tids = train_tracks_by_playlist.get(pid, set())
-            if ignore_tids:
-                mask = torch.ones_like(sims, dtype=torch.bool)
-                ignore_indices = torch.tensor(list(ignore_tids), device=sims.device)
-                mask[ignore_indices] = 0
-                sims_masked = sims.clone()
-                sims_masked[~mask] = -float('inf')  # ensure ignored tracks don't appear in topk
-            else:
-                sims_masked = sims
+            best = min(ranks)
+            test_mrr += 1.0 / best
 
-            # top-K recommended track indices (relative to train tracks)
-            topk_vals, topk_index = torch.topk(sims_masked, K)
-            topk_track_ids = track_ids[topk_index].tolist()
+            dcg = sum(1.0 / math.log2(r + 1) for r in ranks if r <= K)
+            idcg = sum(1.0 / math.log2(i + 2) for i in range(min(len(gt), K)))
+            test_ndcg += (dcg / idcg) if idcg > 0 else 0.0
 
-            # Hit Rate@K: at least one ground-truth track in top-K
-            if any(tid in topk_track_ids for tid in gt_tids):
-                hit_count += 1
+            n += 1
 
-            # Recall@K: fraction of ground-truth tracks in top-K
-            recall_sum += sum(tid in topk_track_ids for tid in gt_tids) / len(gt_tids)
+        n = max(1, n)
+        test_mrr /= n
+        test_ndcg /= n
+        test_hits /= n
+        test_recall /= n
 
-        hit_rate = hit_count / num_playlists
-        recall_at_k = recall_sum / num_playlists
+    print("\n===== FINAL TEST (best val checkpoint) =====")
+    print(f"Best val epoch: {best_epoch} | best_val={best_val_score:.4f}")
+    print(f"TEST gAUC: {test_gauc:.4f} | TEST MRR: {test_mrr:.4f} | TEST NDCG@{K}: {test_ndcg:.4f} | "
+          f"TEST Hits@{K}: {test_hits:.4f} | TEST Recall@{K}: {test_recall:.4f}")
 
-        print(f"Hit Rate@{K}: {hit_rate:.4f}")
-        print(f"Recall@{K}: {recall_at_k:.4f}")
-        print_playlist_track_ranking(builder, train_tracks_by_playlist, playlist_emb, track_emb, K=20)

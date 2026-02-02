@@ -1,12 +1,16 @@
 import json
 import os
+import ssl
 from typing import Dict, List
 
 from mongo import MongoCache
 
+import os, certifi
+os.environ["SSL_CERT_FILE"] = certifi.where()
 
 # Constants
-
+START_FROM = 3
+LIMIT = 550_000
 
 # Cell 2: MPD iterator & small sample fallback
 
@@ -17,15 +21,17 @@ def spotify_url_to_uri(url: str) -> str:
     item_id = parts[-1].split("?")[0]
     return f"spotify:{item_type}:{item_id}"
 
-def iter_mpd_playlists(mpd_dir: str, n=None):
+def iter_mpd_playlists(mpd_dir: str, start=0):
     """Yield playlists from each .json file in mpd_dir (sorted)."""
-    files = [os.path.join(mpd_dir, f) for f in os.listdir(mpd_dir) if f.endswith('.json')]
-    if n is None:
-        files = sorted(files)
-    else:
-        files = sorted(files)[:n]
+    files = sorted(
+        os.path.join(mpd_dir, f)
+        for f in os.listdir(mpd_dir)
+        if f.endswith(".json")
+    )
+
 
     print(f"There is {len(files)} files")
+    idx = 0  # global playlist counter
     for fp in files:
         with open(fp, 'r', encoding='utf-8') as fh:
             try:
@@ -33,8 +39,14 @@ def iter_mpd_playlists(mpd_dir: str, n=None):
             except Exception as e:
                 print(f'Warning: failed to load {fp}: {e}')
                 continue
-            for pl in data.get('playlists', []):
+            for pl in data.get("playlists", []):
+                print(f"Playlist {idx}")
+                if idx < start:
+                    idx += 1
+                    continue
+
                 yield pl
+                idx += 1
 
 import http.client
 
@@ -121,7 +133,8 @@ if __name__ == '__main__':
         'speechiness', 'instrumentalness', 'liveness', 'acousticness'
     ]
 
-    conn = http.client.HTTPSConnection("api.reccobeats.com")
+    context = ssl.create_default_context(cafile=certifi.where())
+    conn = http.client.HTTPSConnection("api.reccobeats.com", context=context)
     payload = ''
     headers = {
         'Accept': 'application/json'
@@ -142,10 +155,9 @@ if __name__ == '__main__':
     signal.signal(signal.SIGTERM, cleanup_handler)
 
     playlists = []
-    limit = 50000
-    for pl in iter_mpd_playlists(mpd_dir):
+    for pl in iter_mpd_playlists(mpd_dir, start=START_FROM):
         playlists.append(pl)
-        if limit and len(playlists) >= limit:
+        if LIMIT and len(playlists) >= LIMIT:
             break
 
     print(f'Loaded {len(playlists)} playlists')

@@ -82,7 +82,7 @@ def build_full_kg(playlists, cache: MongoCache, graph, track_features = None,):
 
     return graph
 
-limit = 50000
+limit = 550000
 mpd_dir = "./archive/data"
 graph = SpotifyMusicGraphSchema()
 cache = MongoCache()

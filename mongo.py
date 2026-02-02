@@ -2,13 +2,17 @@ import pymongo
 from collections.abc import MutableMapping
 # namedtuple is still in collections, so you might need separate imports
 from collections import namedtuple
-
+import certifi
 class MongoCache(object):
     def __init__(self):
         with open("api_keys", "r") as f:
             lines = [line.strip() for line in f.readlines()]
         connection_string = lines[3]
-        self.client = pymongo.MongoClient(connection_string)
+        self.client = pymongo.MongoClient(
+            connection_string,
+            tls=True,
+            tlsCAFile=certifi.where(),  # <-- key line
+        )
         self.TRACKS_NAME = "tracks"
         self.ARTISTS_NAME = "artists"
         self.db = self.client["music-recommender"]

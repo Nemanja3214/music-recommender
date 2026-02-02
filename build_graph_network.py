@@ -9,6 +9,12 @@ MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 MODEL = SentenceTransformer(MODEL_NAME)
 NAME_DIM = MODEL.get_sentence_embedding_dimension()
 
+TRACK_FEATS = [
+    "acousticness", "danceability", "duration", "energy", "instrumentalness",
+    "liveness", "loudness", "speechiness", "tempo", "valence"
+]
+
+
 def embed_name(name: str):
     if not name:
         return np.zeros(NAME_DIM, dtype=np.float32)
@@ -130,12 +136,12 @@ class SpotifyHeteroGraphBuilder:
 
             for uri, idx in id_map.items():
                 feats = self.node_numeric_features.get(uri, {})
-                numeric_vec = np.zeros(numeric_dim, dtype=np.float32)
-
                 # fill numeric features
-                for i, (_, feat_val) in enumerate(feats.items()):
+
+                numeric_vec = np.zeros(len(TRACK_FEATS), dtype=np.float32)
+                for i, name in enumerate(TRACK_FEATS):
                     if i < numeric_dim:
-                        numeric_vec[i] = feat_val
+                        numeric_vec[i] = feats.get(name, 0.0)
 
                 # embed name
                 name_vec = embed_name(self.node_names.get(uri, ""))
