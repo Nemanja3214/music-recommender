@@ -7,30 +7,13 @@ import json
 
 from mongo import MongoCache
 from music_graph import SpotifyMusicGraphSchema
+from playlist_iterator import iter_mpd_playlists, LIMIT
 
 try:
     import faiss
 except Exception:
     faiss = None
 
-def iter_mpd_playlists(mpd_dir: str, n=None):
-    """Yield playlists from each .json file in mpd_dir (sorted)."""
-    files = [os.path.join(mpd_dir, f) for f in os.listdir(mpd_dir) if f.endswith('.json')]
-    if n is None:
-        files = sorted(files)
-    else:
-        files = sorted(files)[:n]
-
-    print(f"There is {len(files)} files")
-    for fp in files:
-        with open(fp, 'r', encoding='utf-8') as fh:
-            try:
-                data = json.load(fh)
-            except Exception as e:
-                print(f'Warning: failed to load {fp}: {e}')
-                continue
-            for pl in data.get('playlists', []):
-                yield pl
 
 def build_full_kg(playlists, cache: MongoCache, graph, track_features = None,):
     # iterate playlists
@@ -82,7 +65,7 @@ def build_full_kg(playlists, cache: MongoCache, graph, track_features = None,):
 
     return graph
 
-limit = 50000
+
 mpd_dir = "./archive/data"
 graph = SpotifyMusicGraphSchema()
 cache = MongoCache()
@@ -90,7 +73,7 @@ cache = MongoCache()
 playlists = []
 for pl in iter_mpd_playlists(mpd_dir):
     playlists.append(pl)
-    if limit and len(playlists) >= limit:
+    if LIMIT and len(playlists) >= LIMIT:
         break
 graph = build_full_kg(playlists, cache, graph)
 graph.serialize()

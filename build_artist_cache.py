@@ -1,30 +1,11 @@
 import json
 import os
-import sqlite3
-import time
-from typing import Optional, List, Tuple
 
 import requests
 
+from playlist_iterator import iter_mpd_playlists, LIMIT
 from mongo import MongoCache
-def iter_mpd_playlists(mpd_dir: str, n=None):
-    """Yield playlists from each .json file in mpd_dir (sorted)."""
-    files = [os.path.join(mpd_dir, f) for f in os.listdir(mpd_dir) if f.endswith('.json')]
-    if n is None:
-        files = sorted(files)
-    else:
-        files = sorted(files)[:n]
 
-    print(f"There is {len(files)} files")
-    for fp in files:
-        with open(fp, 'r', encoding='utf-8') as fh:
-            try:
-                data = json.load(fh)
-            except Exception as e:
-                print(f'Warning: failed to load {fp}: {e}')
-                continue
-            for pl in data.get('playlists', []):
-                yield pl
 
 def get_artist(artist_id: str):
     url = f"https://api.spotify.com/v1/artists/{artist_id}"
@@ -60,7 +41,6 @@ if __name__ == "__main__":
     # Example usage
     # -------------------------------
     mpd_dir = "./archive/data"
-    limit = 50000
 
     import spotipy
     from spotipy.oauth2 import SpotifyOAuth
@@ -97,7 +77,7 @@ if __name__ == "__main__":
     playlists = []
     for pl in iter_mpd_playlists(mpd_dir):
         playlists.append(pl)
-        if limit and len(playlists) >= limit:
+        if LIMIT and len(playlists) >= LIMIT:
             break
 
     unique = {}

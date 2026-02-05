@@ -1,14 +1,19 @@
 from rdflib.namespace import RDF
 import torch
 import numpy as np
-import dgl
 from sentence_transformers import SentenceTransformer
 from music_graph import SpotifyMusicGraphSchema
+from torch_geometric.data import HeteroData
 
-# ---------------- SentenceTransformer Setup ----------------
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 MODEL = SentenceTransformer(MODEL_NAME)
 NAME_DIM = MODEL.get_sentence_embedding_dimension()
+
+TRACK_FEATS = [
+    "acousticness", "danceability", "duration", "energy", "instrumentalness",
+    "liveness", "loudness", "speechiness", "tempo", "valence"
+]
+
 
 def embed_name(name: str):
     if not name:
@@ -20,17 +25,17 @@ def embed_name(name: str):
 class SpotifyHeteroGraphBuilder:
     TYPE_MAP = {
         "MusicRecording": "Track",
+        "MusicPlaylist": "Playlist",
         "MusicGroup": "Artist",
         # "MusicAlbum": "Album",
-        "MusicPlaylist": "Playlist",
-        "Genre": "Genre",
+        # "Genre": "Genre",
     }
 
-    def __init__(self, smg):
-        self.smg = smg
-        self.g = smg.g
-        self.FEATURES_PREFIX = str(smg.FEATURES_PREFIX)
-        self.SCHEMA = smg.SCHEMA
+    def __init__(self):
+        self.smg = SpotifyMusicGraphSchema("./graph_schema.ttl")
+        self.g = self.smg.g
+        self.FEATURES_PREFIX = str(self.smg.FEATURES_PREFIX)
+        self.SCHEMA = self.smg.SCHEMA
 
         self.entity_type = {}
         self.nodes_id_map = {}
@@ -43,6 +48,7 @@ class SpotifyHeteroGraphBuilder:
         for s, p, o in self.g:
             if p == RDF.type:
                 type_name = str(o).split("/")[-1]
+
                 if type_name in self.TYPE_MAP:
                     self.entity_type[str(s)] = self.TYPE_MAP[type_name]
         # initialize dictionary for each type
@@ -88,6 +94,10 @@ class SpotifyHeteroGraphBuilder:
             if ou not in self.nodes_id_map[ot]:
                 self.nodes_id_map[ot][ou] = len(self.nodes_id_map[ot])
 
+            # TODO added
+            ps = ps.split("/")[-1]
+            if ps == "Track":
+                ps = "Has Track"
             key = (st, ps, ot)
             # edges in the format (source_type, predicate, dest_type) -> list of (src_id, dst_id)
             if key not in self.relations:
@@ -95,48 +105,65 @@ class SpotifyHeteroGraphBuilder:
             self.relations[key].append((self.nodes_id_map[st][su], self.nodes_id_map[ot][ou]))
 
     def build_heterograph(self):
-        data_dict = {}
-        # using canonical because for example byArtist is ambiguous it can be used for albums and tracks
+        data = HeteroData()
+        max_feature_list_len = 256
+
+        # -------------------------
+        # 1. Add edges (PyG style)
+        # -------------------------
         for (st, pred, ot), edges in self.relations.items():
-            # Original edges: [('A', 'B'), ('B', 'C'), ('C', 'A')]
-            # after zip:
-            # Sources: ('A', 'B', 'C')
-            # Destinations: ('B', 'C', 'A')
+            if not edges:
+                continue
             src_ids, dst_ids = zip(*edges)
-            data_dict[(st, pred, ot)] = (torch.tensor(src_ids), torch.tensor(dst_ids))
+            edge_index = torch.tensor([src_ids, dst_ids], dtype=torch.long)
+            # canonical hetero key in PyG: (src_type, relation, dst_type)
+            data[(st, pred, ot)].edge_index = edge_index
 
-        hg = dgl.heterograph(data_dict)
-
-        # for each type
-        for ntype in hg.ntypes:
-            # get number of nodes for that type
-            num_nodes = hg.num_nodes(ntype)
+        # -------------------------
+        # 2. Add node features
+        # -------------------------
+        for ntype, id_map in self.nodes_id_map.items():
+            num_nodes = len(id_map)
             numeric_dim = 0
 
-            for uri, idx in self.nodes_id_map[ntype].items():
-                # get previously extracted numerical features
+            # find max numeric feature dimension
+            for uri in id_map.keys():
                 feats = self.node_numeric_features.get(uri, {})
                 numeric_dim = max(numeric_dim, len(feats))
 
-            # combine numerical and string(this one is fixed and is NAME_DIM) size get dimension,
-            total_dim = numeric_dim + NAME_DIM
+            total_dim = max_feature_list_len
             mat = torch.zeros((num_nodes, total_dim), dtype=torch.float32)
 
-            # go through each node
-            for uri, idx in self.nodes_id_map[ntype].items():
+            for uri, idx in id_map.items():
                 feats = self.node_numeric_features.get(uri, {})
-                numeric_vec = np.zeros(numeric_dim, dtype=np.float32)
-                # extract feat values and put them in vector
-                for i, (feat_name, feat_val) in enumerate(feats.items()):
-                    if i < numeric_dim:
-                        numeric_vec[i] = feat_val
-                # concatenate name embedding
-                name_vec = embed_name(self.node_names.get(uri, ""))
-                combined_vec = np.concatenate([numeric_vec, name_vec])
-                mat[idx] = torch.tensor(combined_vec)
-            hg.nodes[ntype].data["feat"] = mat
+                # fill numeric features
 
-        return hg
+                numeric_vec = np.zeros(len(TRACK_FEATS), dtype=np.float32)
+                for i, name in enumerate(TRACK_FEATS):
+                    if i < numeric_dim:
+                        numeric_vec[i] = feats.get(name, 0.0)
+
+                # embed name
+                name_vec = embed_name(self.node_names.get(uri, ""))
+
+                # combine
+                combined_vec = np.concatenate([numeric_vec, name_vec])
+                if len(combined_vec) < max_feature_list_len:
+                    combined_vec = np.concatenate([
+                        combined_vec,
+                        np.zeros(max_feature_list_len - len(combined_vec), dtype=np.float32)
+                    ])
+                else:
+                    combined_vec = combined_vec[:max_feature_list_len]
+
+                mat[idx] = torch.tensor(combined_vec)
+
+            # assign features to PyG node type
+            data[ntype].x = mat
+            data[ntype].ids = id_map.values()
+            data[ntype].num_nodes = num_nodes
+
+        return data
 
     def run(self):
         self.collect_rdf_types()
@@ -145,22 +172,39 @@ class SpotifyHeteroGraphBuilder:
         hg = self.build_heterograph()
         return hg, self.nodes_id_map
 
+
+
 # ---------------- Function to print graph info ----------------
-def print_graph_info(hg, node_id_map):
-    print("==== Heterograph Info ====")
-    for ntype in hg.ntypes:
-        print(f"Node type: {ntype}, num_nodes: {hg.num_nodes(ntype)}, feat shape: {hg.nodes[ntype].data['feat'].shape}")
-        print(f"Features {hg.nodes[ntype].data['feat']}")
-    for etype in hg.canonical_etypes:
-        src, dst = hg.edges(etype=etype)
-        print(f"Edge type: {etype}, num_edges: {len(src)}")
-    print("Node ID mapping example (first 5 per type):")
+def print_graph_info(hg: HeteroData, node_id_map):
+    print("==== Heterograph Info (PyG) ====")
+
+    # ---- Node types ----
+    for ntype in hg.node_types:
+        x = hg[ntype].get("x", None)
+        num_nodes = hg[ntype].num_nodes
+        print(f"\nNode type: {ntype}")
+        print(f"  num_nodes: {num_nodes}")
+        if x is not None:
+            print(f"  feature shape: {tuple(x.shape)}")
+        else:
+            print("  feature shape: None")
+
+    # ---- Edge types ----
+    print("\n---- Edge Types ----")
+    for etype in hg.edge_types:
+        edge_index = hg[etype].edge_index
+        num_edges = edge_index.size(1)
+        print(f"Edge type: {etype}  num_edges: {num_edges}")
+
+    # ---- Example node ID mappings ----
+    print("\n---- Node ID mapping (first 5 entries) ----")
     for ntype, mapping in node_id_map.items():
-        print(ntype, {k: v for k, v in list(mapping.items())[:5]})
+        preview = list(mapping.items())[:5]
+        print(f"{ntype}: {preview}")
 
 
-# ---------------- Run ----------------
-smg = SpotifyMusicGraphSchema("./graph_schema.ttl")
-builder = SpotifyHeteroGraphBuilder(smg)
+
+# # ---------------- Run ----------------
+builder = SpotifyHeteroGraphBuilder()
 hg, node_id_map = builder.run()
 print_graph_info(hg, node_id_map)
