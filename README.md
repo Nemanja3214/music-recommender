@@ -29,10 +29,10 @@ dodata(danceability, valor, energy, loudness...). Pomoćne funkcije za izgradnju
 nalaze u music_graph dok se iteracija kroz plejliste i korišćenje ovog modula za konkretne
 podatke nalazi u build_kg modulo.
 
-
+![alt text](image.png)
 Slika 1. Graf bez audio svojstava
 
-
+![alt text](image-1.png)
 Slika 2. Graf sa audio svojstvima
 Nakon ograničenog broja iteracija kroz fajlove graf se čuva u RDF formatu.
 
@@ -204,6 +204,7 @@ optimizer.step()
 epoch_losses.append(loss.item())
 ```
 Listing 6. Trening
+![alt text](image-3.png)
 Formula 1. Funkcija greške je cross-entropy po ivicama
 Za svaku pozitivnu ivicuimamo num_neg negativnih ivica, za njih se računaju score-ovi između
 track i playlist embedding-a i te scorove ubacujemo u funkciju greške. Greška prioritizuje
@@ -226,7 +227,7 @@ pogledati poredjenje metrika.
 
 Rezultati su daleko od idealnih medjutim uz dalji rad verujem da se mogu popraviti.
 
-
+![alt text](image-4.png)
 Slika 3. Funkcija greške
 Model uči međutim iako stepeni playlist čvorova idu i do 140, stepeni track čvorova su izuzetno
 mali i ne prelaze 12 i ovo je problem jer Reccobeats API nema podatke za dosta pesama te ih u
@@ -234,8 +235,9 @@ izdradnji grafa modul ignoriše, zvaničan Spotify API za audio svojstva je ukin
 korišćenjem drugih API-ja ili preuzimanje modela koji su sposobni da izvuku svojstva smatram
 da bi ispravilo ovo dosta stoga ovo bi bio sledeći korak.
 
-
+![alt text](image-5.png)
 Slika 4. Box plotovi stepena čvorova
+![alt text](image-6.png)
 Slika 5. Najbolji Recall@K je 0.
 
 
