@@ -144,6 +144,7 @@ Učitani graf:
 1. Normalizijemo svojstva čvorova
 2. Ivice postavljamo da budu neusmerene kako bi povećali protok poruka
 3. Delimo na train, val, test(u odnosu 0.6, 0.2, 0.2 respektivno)
+<br>
 Napomena - nikada ne stavljati val_ratio da bude 0.0, Pyg ima bug da onda dopušta data leak,
 edge_index bude isti za train i test, message passing treba da bude omogućen SAMO na
 trening ivicama
@@ -253,5 +254,14 @@ Slika 5. Najbolji Recall@K je 0.0238
 <br>
 <br>
 <br>
+## Pokretanje
+Dobavljanje podataka:<br>
+1. Pokrenuti build_track_cache
+2. Pokrenuti spotipy_server
+3. Pokrenuti build_artist_cache
+
+Pokretanje modela:<br>
+Pokrenuti model_pyg
+
 
 
