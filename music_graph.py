@@ -1,0 +1,204 @@
+from rdflib import Graph, URIRef, Literal, Namespace
+from rdflib.namespace import RDF, RDFS
+# import matplotlib.pyplot as plt
+import networkx as nx
+
+from sentence_transformers import SentenceTransformer
+import numpy as np
+import torch
+
+# Load pretrained model
+NAME_MODEL = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+NAME_DIM = NAME_MODEL.get_sentence_embedding_dimension()
+
+def get_node_feature(name, numeric_feature_dict):
+    """
+    Combines numeric features + name embedding into a single vector.
+    numeric_feature_dict: {feature_name: value}
+    """
+    # 1️⃣ Numeric features
+    if numeric_feature_dict:
+        numeric_vec = np.array(list(numeric_feature_dict.values()), dtype=np.float32)
+    else:
+        numeric_vec = np.zeros(0, dtype=np.float32)
+
+    # 2️⃣ Name embedding
+    name_vec = NAME_MODEL.encode(name)  # np.ndarray
+
+    # 3️⃣ Concatenate
+    combined = np.concatenate([numeric_vec, name_vec]).astype(np.float32)
+    return combined
+
+
+class SpotifyMusicGraphSchema:
+    def __init__(self, path=None):
+        self.g = Graph()
+        if path is not None:
+            self.g.parse("graph_schema.ttl", format="ttl")
+
+        self.SCHEMA = Namespace("http://schema.org/")
+        self.SPOTIFY_PREFIX = "http://example.org/spotify/"
+        self.FEATURES_PREFIX = "http://example.org/features/"
+        self.SPOTIFY_PLAYLIST_PREFIX = self.SPOTIFY_PREFIX + "playlist/"
+
+        # Bind namespaces
+        self.g.bind("schema", self.SCHEMA)
+        self.g.bind("rdfs", RDFS)
+
+    def safe_uri(self, value):
+        if isinstance(value, URIRef):
+            return value
+        if isinstance(value, str):
+            return URIRef(value)
+        raise ValueError(f"Invalid URI type: {value} ({type(value)})")
+
+    def add_artist(self, uri, name, genre_uris, features):
+        artist = self.safe_uri(uri)
+        self.g.add((artist, RDF.type, self.SCHEMA.MusicGroup))
+        if name:
+            self.g.add((artist, self.SCHEMA.Name, Literal(name)))
+        if genre_uris:
+            if type(genre_uris) is not list:
+                genre_uris = [genre_uris]
+            for genre_uri in genre_uris:
+                self.g.add((artist, self.SCHEMA.genre, URIRef(genre_uri)))
+        self.add_features(artist, features)
+        return artist
+
+    def add_album(self, uri, title, artists_uri):
+        album = self.safe_uri(uri)
+        self.g.add((album, RDF.type, self.SCHEMA.MusicAlbum))
+        if title:
+            self.g.add((album, self.SCHEMA.Name, Literal(title)))
+        if artists_uri:
+            if type(artists_uri) is not list:
+                artists_uri = [artists_uri]
+            for artist_uri in artists_uri:
+                if artist_uri:
+                    self.g.add((album, self.SCHEMA.byArtist, URIRef(artist_uri)))
+        return album
+
+    def add_track(self, uri, title, album_uri, artists_uri, features):
+        track = self.safe_uri(uri)
+        self.g.add((track, RDF.type, self.SCHEMA.MusicRecording))
+        if title:
+            self.g.add((track, self.SCHEMA.Name, Literal(title)))
+        if album_uri:
+            self.g.add((track, self.SCHEMA.inAlbum, URIRef(album_uri)))
+        if artists_uri:
+            if type(artists_uri) is not list:
+                artists_uri = [artists_uri]
+            for artist_uri in artists_uri:
+                if artist_uri:
+                    self.g.add((track, self.SCHEMA.byArtist, URIRef(artist_uri)))
+        self.add_features(track, features)
+        return track
+
+    def add_playlist(self, uri, track_uris, name, features):
+        playlist = self.safe_uri(uri)
+        self.g.add((playlist, RDF.type, self.SCHEMA.MusicPlaylist))
+        self.g.add((playlist, self.SCHEMA.Name, Literal(name)))
+
+        if track_uris:
+            for idx, track_uri in enumerate(track_uris, start=1):
+                self.g.add((playlist, self.SCHEMA.Track, URIRef(track_uri)))
+        self.add_features(playlist, features)
+        return playlist
+
+    def add_genre(self, uri, name=None):
+        genre = self.safe_uri(uri)
+        self.g.add((genre, self.SCHEMA.Name, Literal(name)))
+        self.g.add((genre, RDF.type, self.SCHEMA.Genre))
+        return genre
+
+    def serialize(self, fmt="turtle"):
+        return self.g.serialize("./graph_schema.ttl", format=fmt)
+
+    def get_label(self, node):
+        label = self.g.value(subject=node, predicate=RDFS.label)
+        return str(label) if label else str(node)
+
+    # def visualize_rdf_graph(self):
+    #     import math
+    #
+    #     G = nx.DiGraph()
+    #
+    #     for s, p, o in self.g:
+    #         s_label = self.get_label(s)
+    #         o_label = self.get_label(o) if isinstance(o, URIRef) else str(o)
+    #
+    #         if len(s_label) > 25: s_label = s_label[:25] + "..."
+    #         if len(o_label) > 25: o_label = o_label[:25] + "..."
+    #
+    #         G.add_node(s_label)
+    #         G.add_node(o_label)
+    #
+    #         edge_label = str(p.split('#')[-1] if '#' in str(p) else p.split('/')[-1])
+    #         G.add_edge(s_label, o_label, label=edge_label)
+    #
+    #     n = max(len(G.nodes), 1)
+    #     k = 1 / math.sqrt(n)
+    #     pos = nx.spring_layout(G, k=k * 3, iterations=200, seed=42)
+    #
+    #     plt.figure(figsize=(18, 12))
+    #     nx.draw_networkx_nodes(G, pos, node_color='skyblue', node_size=900, edgecolors="black")
+    #     nx.draw_networkx_edges(G, pos, arrowstyle='-|>', arrowsize=15, connectionstyle="arc3,rad=0.15")
+    #     nx.draw_networkx_labels(G, pos, font_size=8, font_weight='bold')
+    #
+    #     edge_labels = nx.get_edge_attributes(G, 'label')
+    #     nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels,
+    #                                  font_color='darkred', font_size=7,
+    #                                  bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7))
+    #
+    #     plt.title("Spotify Music RDF Graph (Schema.org) Visualization", fontsize=14)
+    #     plt.axis("off")
+    #     plt.tight_layout()
+    #     plt.savefig("plot_schema.png", dpi=300)
+    #     plt.close()
+
+    def add_features(self, uri, features):
+        for key, item in features.items():
+            self.g.add((uri, URIRef(self.FEATURES_PREFIX + f"{key}"), Literal(item)))
+
+
+
+
+# ===== Example usage =====
+if __name__ == "__main__":
+    smg = SpotifyMusicGraphSchema()
+    tracks = []
+    for i in range(10):
+        i_str = str(i)
+        rock = smg.add_genre("spotify:genre:rock", "Rock"+i_str)
+        bts = smg.add_artist("spotify:artist:3Nrfpe0tUJi4K4DXYWgMUX"+i_str, "BTS"+i_str, rock, {
+                        "num_followers": 5,
+                        "popularity": 80
+                    })
+        be_album = smg.add_album("spotify:album:1ATL5GLyefJaxhQzSPVrLX"+i_str, "BE"+i_str, bts)
+        track1 = smg.add_track("spotify:track:6rqhFgbbKwnb9MLmUQDhG6"+i_str, "Dynamite"+i_str, be_album, [bts], {
+            "danceability": 0.423,
+            "energy": 0.94,
+            "valence": 0.505,
+            "tempo": 149.934,
+            "loudness": -4.012,
+            "speechiness": 0.0635,
+            "instrumentalness": 0,
+            "liveness": 0.178,
+            "acousticness": 0.00166,
+            "duration": 123,
+            "pos": 1
+        })
+        tracks.append(track1)
+        # track2 = smg.add_track("spotify:track:0eGsygTp906u18L0Oimnem", "Butter", album_uri=be_album, artists_uri=bts)
+        playlist = smg.add_playlist("spotify:playlist:37i9dQZF1DXcBWIGoYBM5M"+i_str, [track1],"Mood", {
+        "modified_at": 423543656,
+        "num_tracks": 1,
+        "num_albums": 1,
+        "num_followers": 231231224})
+    playlist = smg.add_playlist("spotify:playlist:37i9dQZF1DXcBWIGoYBM5Mscacqcq" + i_str, tracks, "All", {
+        "modified_at": 423543656,
+        "num_tracks": 10,
+        "num_albums": 1,
+        "num_followers": 231231224})
+    # smg.visualize_rdf_graph()
+    smg.serialize()
