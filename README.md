@@ -30,9 +30,12 @@ nalaze u music_graph dok se iteracija kroz plejliste i korišćenje ovog modula 
 podatke nalazi u build_kg modulo.
 
 ![alt text](image.png)
+<br>
 Slika 1. Graf bez audio svojstava
+<br>
 
 ![alt text](image-1.png)
+<br>
 Slika 2. Graf sa audio svojstvima
 Nakon ograničenog broja iteracija kroz fajlove graf se čuva u RDF formatu.
 
@@ -187,8 +190,7 @@ t_neg = sample_bpr_negatives_train_only(p_pos, num_tracks, train_pos_set,
 num_neg= 50 ) #[E, num_neg]
 # scores: [E] and [E,num_neg]
 pos_scores = (playlist_emb[p_pos] * track_emb[t_pos]).sum(dim= 1 ) # [E]
-neg_scores = (playlist_emb[p_pos].unsqueeze( 1 ) * track_emb[t_neg]).sum( 2 ) #
-[E,num_neg]
+neg_scores = (playlist_emb[p_pos].unsqueeze( 1 ) * track_emb[t_neg]).sum( 2 ) #[E,num_neg]
 logits = torch.cat([pos_scores.unsqueeze( 1 ), neg_scores], dim= 1 ) # [E,
 num_neg+1]
 labels = torch.zeros(logits.size( 0 ), dtype=torch.long, device=logits.device)
@@ -204,8 +206,11 @@ optimizer.step()
 epoch_losses.append(loss.item())
 ```
 Listing 6. Trening
+<br>
 ![alt text](image-3.png)
+<br>
 Formula 1. Funkcija greške je cross-entropy po ivicama
+<br><br><br>
 Za svaku pozitivnu ivicuimamo num_neg negativnih ivica, za njih se računaju score-ovi između
 track i playlist embedding-a i te scorove ubacujemo u funkciju greške. Greška prioritizuje
 poklapanje pozitivnih u odnosu na negativne.
@@ -228,6 +233,7 @@ pogledati poredjenje metrika.
 Rezultati su daleko od idealnih medjutim uz dalji rad verujem da se mogu popraviti.
 
 ![alt text](image-4.png)
+<br>
 Slika 3. Funkcija greške
 Model uči međutim iako stepeni playlist čvorova idu i do 140, stepeni track čvorova su izuzetno
 mali i ne prelaze 12 i ovo je problem jer Reccobeats API nema podatke za dosta pesama te ih u
@@ -236,8 +242,16 @@ korišćenjem drugih API-ja ili preuzimanje modela koji su sposobni da izvuku sv
 da bi ispravilo ovo dosta stoga ovo bi bio sledeći korak.
 
 ![alt text](image-5.png)
+<br>
+<br><br>
 Slika 4. Box plotovi stepena čvorova
+<br><br><br>
 ![alt text](image-6.png)
-Slika 5. Najbolji Recall@K je 0.
+<br><br><br>
+Slika 5. Najbolji Recall@K je 0.0238 
+<br>
+<br>
+<br>
+<br>
 
 
