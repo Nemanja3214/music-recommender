@@ -17,12 +17,12 @@ keširani u MongoDB bazi podataka. Keširanje za pesme radi build_track_cache a 
 
 ## Graf znanja
 
-Graf poštuje Schema.org ontologiju i mapiranje je sledeće:
-Artist -> MusicGroup
-Album -> MusicAlbum
-Track -> MusicRecording
-Playlist -> MusicPlaylist
-Genre -> Literal
+Graf poštuje Schema.org ontologiju i mapiranje je sledeće:<br>
+Artist -> MusicGroup <br>
+Album -> MusicAlbum<br>
+Track -> MusicRecording<br>
+Playlist -> MusicPlaylist<br>
+Genre -> Literal<br>
 Za relacije i ostala svojstva predvidjena ontologijom posetiti Schema.org. Takodje audio svojstva
 pesama koja su bitna za algoritam učenja nisu predvidjena ontologijom te su naknadno
 dodata(danceability, valor, energy, loudness...). Pomoćne funkcije za izgradnju ovog grafa se
@@ -36,7 +36,7 @@ Slika 1. Graf bez audio svojstava
 
 ![alt text](image-1.png)
 <br>
-Slika 2. Graf sa audio svojstvima
+Slika 2. Graf sa audio svojstvima<br>
 Nakon ograničenog broja iteracija kroz fajlove graf se čuva u RDF formatu.
 
 ## Model za preporuku
@@ -235,7 +235,7 @@ Rezultati su daleko od idealnih medjutim uz dalji rad verujem da se mogu popravi
 
 ![alt text](image-4.png)
 <br>
-Slika 3. Funkcija greške
+Slika 3. Funkcija greške<br>
 Model uči međutim iako stepeni playlist čvorova idu i do 140, stepeni track čvorova su izuzetno
 mali i ne prelaze 12 i ovo je problem jer Reccobeats API nema podatke za dosta pesama te ih u
 izdradnji grafa modul ignoriše, zvaničan Spotify API za audio svojstva je ukinut tako da
