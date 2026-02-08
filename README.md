@@ -8,16 +8,16 @@
 
 Podaci plejlisti su dobavljeni iz Spotify million datasets koji sadrži milion plejlisti zajedno sa
 njenim osnovnim podacima kao i pesmama na svakoj plejlisti zajedno sa osnovnim podacima
-pesama(spotify million). Podaci o muzičarima i žanrovima su dobavljeni sa zvaničnog Spotify
-developer API-ja(Spotify Web API) dok su audio svojstva pesama preuzeta sa Reccobeats
-API-ja(Reccobeats). Spotify million dolazi u vidu isečenih fajlova te iteracijom kroz fajlove treba
+pesama([spotify million](https://www.kaggle.com/datasets/himanshuwagh/spotify-million)). Podaci o muzičarima i žanrovima su dobavljeni sa zvaničnog Spotify
+developer API-ja([Spotify Web API](https://developer.spotify.com/documentation/web-api)) dok su audio svojstva pesama preuzeta sa Reccobeats
+API-ja([Reccobeats](https://reccobeats.com/)). Spotify million dolazi u vidu isečenih fajlova te iteracijom kroz fajlove treba
 naći ostale podatke kao što su žanrovi, muzičari i audio svojstva ispojiti ih, ovi ostali podaci su
 keširani u MongoDB bazi podataka. Keširanje za pesme radi build_track_cache a za muzičare i
 žanrove build_artist_cache.
 
 ## Graf znanja
 
-Graf poštuje Schema.org ontologiju i mapiranje je sledeće:<br>
+Graf poštuje [Schema.org](http://Schema.org) ontologiju i mapiranje je sledeće:<br>
 Artist -> MusicGroup <br>
 Album -> MusicAlbum<br>
 Track -> MusicRecording<br>
@@ -43,7 +43,7 @@ Nakon ograničenog broja iteracija kroz fajlove graf se čuva u RDF formatu.
 
 Build_graph_network služi da učita RDF graf i da ga mapira na Pyg graf pogodan za mašinsko
 učenje. Tekstualna obeležja se transformišu pomoću pretreniranog
-SentenceTransformer-a(SentenceTransformer) i to se nakon transformacije konkatenira sa
+SentenceTransformer-a([SentenceTransformer](https://huggingface.co/sentence-transformers)) i to se nakon transformacije konkatenira sa
 numeričkim svojstvima gde to u stvari predstavlja embedding svakog čvora. U ovakvim
 sistemima za preporuku se često koriste bipartitni grafovi(PinSage) gde graf prestavlja
 interakciju izmedju kolekcije stvari i samih stvari, međutim ideja se može proširiti u vidu
@@ -227,7 +227,7 @@ Validacija i evaluacija koriste iste metrike za prikaz međutim metrika koji kor
 model u validaciji će biti Recall@K, jer je najbitnije da se obuhvati što više pesama koje zapravo
 jesu u plejlisti i da se nalaze u top K preporuka, ali nije nam bitan redosled. Ostale metrike koje
 smo posmatrali trening margina, gAUC, MRR, NDCG, Hits@K, za više o ovim metrikama
-pogledati poredjenje metrika.
+pogledati [poredjenje metrika](https://arxiv.org/pdf/2206.12858).
 
 ## Rezultati
 
